@@ -1,5 +1,6 @@
 import json
 import re
+import os
 
 # Ask for user's personal information
 def get_user_info():
@@ -19,6 +20,10 @@ def get_user_info():
 
 # Get user's personal information
 user_info = get_user_info()
+
+# Create client directory
+client_dir = os.path.join('clients', user_info['name'].replace(' ', '_').lower())
+os.makedirs(client_dir, exist_ok=True)
 
 def parse_psychotherapists(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
@@ -202,19 +207,21 @@ def create_email_drafts(data, user_info):
 file_path = 'Arzt-_und_Psychotherapeutensuche_der_KV_Berlin.txt'
 parsed_data = parse_psychotherapists(file_path)
 
-# Save parsed data to JSON
-with open('parsed_data.json', 'w', encoding='utf-8') as json_file:
+# Save parsed data to JSON in client directory
+parsed_data_path = os.path.join(client_dir, 'parsed_data.json')
+with open(parsed_data_path, 'w', encoding='utf-8') as json_file:
     json.dump(parsed_data, json_file, ensure_ascii=False, indent=4)
 
-# Create Markdown table
-markdown_file_path = 'parsed_data.md'
+# Create Markdown table in client directory
+markdown_file_path = os.path.join(client_dir, 'parsed_data.md')
 create_markdown_table(parsed_data, markdown_file_path)
 
 # Create email drafts with user info
 email_drafts = create_email_drafts(parsed_data, user_info)
 
-# Save email drafts to JSON for review
-with open('email_drafts.json', 'w', encoding='utf-8') as email_file:
+# Save email drafts to JSON for review in client directory
+email_drafts_path = os.path.join(client_dir, 'email_drafts.json')
+with open(email_drafts_path, 'w', encoding='utf-8') as email_file:
     json.dump(email_drafts, email_file, ensure_ascii=False, indent=4)
 
 # Print email drafts to console for review
