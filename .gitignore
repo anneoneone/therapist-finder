@@ -182,15 +182,11 @@ $RECYCLE.BIN/
 *.msp
 *.lnk
 
-# Project-specific generated files
-parsed_data.json
-parsed_data.md
-email_drafts.json
-*.xlsx
-*.xls
-
 # Clients directory with all client-specific data
 clients/
+
+# Test directories
+test_clients/
 
 # Personal data files (containing sensitive information)
 Arzt-_und_Psychotherapeutensuche_der_KV_Berlin*.txt
@@ -203,9 +199,14 @@ Arzt-_und_Psychotherapeutensuche_der_KV_Berlin*.txt
 *.temp
 *~
 
-# Log files
-*.log
-
 # Configuration files that might contain sensitive data
 .mcp-config.json
 .qodo/
+
+# Old legacy files
+parse_psychotherapie.py
+create_apple_script_mails_psychotherapie.py
+pdf_therapist_parser.py
+therapist_processor.py
+install.sh
+requirements.txt
