@@ -27,6 +27,7 @@ def parse_psychotherapists(file_path):
     data = []
     current_entry = {}
     current_section = None
+    seen_emails = set()  # Set für eindeutige E-Mails
 
     for line in lines:
         line = line.strip()
@@ -34,9 +35,15 @@ def parse_psychotherapists(file_path):
         if not line:
             continue
 
+        # if "Fach" in line:
         if line.startswith("Psychologische Psychotherapeutin") or line.startswith("Psychologischer Psychotherapeut"):
             if current_entry:
-                data.append(current_entry)
+                # Nur hinzufügen, wenn keine doppelte E-Mail
+                email = current_entry.get("email")
+                if not email or email not in seen_emails:
+                    if email:
+                        seen_emails.add(email)
+                    data.append(current_entry)
                 current_entry = {}
             current_section = "name"
             continue
@@ -60,7 +67,12 @@ def parse_psychotherapists(file_path):
             continue
 
         if line.startswith("E-Mail:"):
-            current_entry["email"] = line.split("E-Mail:")[1].strip()
+            email = line.split("E-Mail:")[1].strip()
+            if email not in seen_emails:
+                current_entry["email"] = email
+            else:
+                # Markiere diesen Eintrag als Duplikat, damit er später nicht gespeichert wird
+                current_entry["duplicate_email"] = True
             continue
 
         if line == "Psychotherapie":
@@ -78,17 +90,28 @@ def parse_psychotherapists(file_path):
 
         if current_section == "sprechzeiten":
             if line.startswith("Psychologische Psychotherapeutin") or line.startswith("Psychologischer Psychotherapeut"):
-                data.append(current_entry)
+                # Duplikate hier auch checken
+                email = current_entry.get("email")
+                if not email or (email not in seen_emails and not current_entry.get("duplicate_email", False)):
+                    if email:
+                        seen_emails.add(email)
+                    data.append(current_entry)
                 current_entry = {}
                 current_section = "name"
                 continue
             current_entry["sprechzeiten"].append(line)
             continue
 
+    # Letzten Eintrag prüfen
     if current_entry:
-        data.append(current_entry)
+        email = current_entry.get("email")
+        if not email or (email not in seen_emails and not current_entry.get("duplicate_email", False)):
+            if email:
+                seen_emails.add(email)
+            data.append(current_entry)
 
     return data
+
 
 def create_markdown_table(data, markdown_file_path):
     with open(markdown_file_path, 'w', encoding='utf-8') as md_file:
@@ -110,30 +133,51 @@ def create_markdown_table(data, markdown_file_path):
             
             md_file.write(f"| {name} | {address} | {telefon} | {email} | {therapieform} | {sprechzeiten} | {kontaktiert} | {datum} | {status} |\n")
 
+# def create_email_drafts(data, user_info):
+#     email_template = """
+# <ANREDE>,
+
+# mein Name ist {name} und ich bin auf der Suche nach einem Platz für eine Psychotherapie. Aus diesem Grund möchte ich Sie fragen, ob Sie dafür grundlegend Kapazitäten hätten und mir in absehbarer Zeit einen Termin für eine Probestunde anbieten können.
+
+# Ich hatte bereits ein Erstgespräch bei einem Ihrer Kollegen. In diesem Rahmen wurde mir ein Überweisungsschein und eine Empfehlung für den Beginn einer Therapie (mit der Bemerkung ”zeitnah erforderlich”) ausgestellt. Da ich Kassenpatient bin, suche ich vorrangig PsychotherapeutInnen mit Kassensitz.
+
+# Falls benötigt, ist hier der Vermittlungscode: {vermittlungscode}
+
+# Außerdem hier meine Kontaktdaten:
+# {name}
+# {address}
+# Tel.: {telefon}
+# Mail: {email}
+
+# Sollten Sie noch weitere Daten von mir benötigen, kontaktieren Sie mich gerne! Auch wenn Sie mir keinen Platz anbieten können, würde ich mich über eine kurze Absage freuen.
+
+# Ich wünsche einen schönen Tag!
+
+# Mit freundlichen Grüßen,
+
+# {name}
+# """
+
 def create_email_drafts(data, user_info):
-    email_template = """
-<ANREDE>,
+    email_template = """<ANREDE>,
+mein Name ist Philipp Jester.
 
-mein Name ist {name} und ich bin auf der Suche nach einem Platz für eine Psychotherapie. Aus diesem Grund möchte ich Sie fragen, ob Sie dafür grundlegend Kapazitäten hätten und mir in absehbarer Zeit einen Termin für eine Probestunde anbieten können.
+Ich bewerbe mich hiermit um einen Platz zur Verhaltenstherapie. Ein erstes Gespräch zur Abklärung habe ich bereits geführt, und im Rahmen dessen wurde mir der Vermittlungscode BYK9-YMDS-5FRY mitgeteilt.
 
-Ich hatte bereits ein Erstgespräch bei einem Ihrer Kollegen. In diesem Rahmen wurde mir ein Überweisungsschein und eine Empfehlung für den Beginn einer Therapie (mit der Bemerkung ”zeitnah erforderlich”) ausgestellt. Da ich Kassenpatient bin, suche ich vorrangig PsychotherapeutInnen mit Kassensitz.
+Meine Kontaktdaten:
+Philipp Jester 
+Schwedterstr. 22, 10119 Berlin
+Tel.: 0177 4507458
+E-Mail: info@philippjester.com
 
-Falls benötigt, ist hier der Vermittlungscode: {vermittlungscode}
+Die Kostenübernahme erfolgt über meine gesetzliche Krankenkasse (Bahn-BKK).
 
-Außerdem hier meine Kontaktdaten:
-{name}
-{address}
-Tel.: {telefon}
-Mail: {email}
+Über eine Rückmeldung und Informationen zum weiteren Vorgehen würde ich mich sehr freuen!
 
-Sollten Sie noch weitere Daten von mir benötigen, kontaktieren Sie mich gerne! Auch wenn Sie mir keinen Platz anbieten können, würde ich mich über eine kurze Absage freuen.
-
-Ich wünsche einen schönen Tag!
-
-Mit freundlichen Grüßen
-
-{name}
+Mit besten Grüßen
+Philipp Jester
 """
+
 
     drafts = []
 
@@ -160,7 +204,7 @@ Mit freundlichen Grüßen
             )
             drafts.append({
                 "to": entry["email"],
-                "subject": "Anfrage für Analytische Psychotherapie",
+                "subject": "Terminanfrage",
                 "body": email_body
             })
 
