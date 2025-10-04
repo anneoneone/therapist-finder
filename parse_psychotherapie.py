@@ -159,24 +159,12 @@ def create_markdown_table(data, markdown_file_path):
 # """
 
 def create_email_drafts(data, user_info):
-    email_template = """<ANREDE>,
-mein Name ist Philipp Jester.
-
-Ich bewerbe mich hiermit um einen Platz zur Verhaltenstherapie. Ein erstes Gespräch zur Abklärung habe ich bereits geführt, und im Rahmen dessen wurde mir der Vermittlungscode BYK9-YMDS-5FRY mitgeteilt.
-
-Meine Kontaktdaten:
-Philipp Jester 
-Schwedterstr. 22, 10119 Berlin
-Tel.: 0177 4507458
-E-Mail: info@philippjester.com
-
-Die Kostenübernahme erfolgt über meine gesetzliche Krankenkasse (Bahn-BKK).
-
-Über eine Rückmeldung und Informationen zum weiteren Vorgehen würde ich mich sehr freuen!
-
-Mit besten Grüßen
-Philipp Jester
-"""
+    # Read email template from external file
+    try:
+        with open('email_template.txt', 'r', encoding='utf-8') as template_file:
+            email_template = template_file.read()
+    except FileNotFoundError:
+        raise FileNotFoundError("Email template file 'email_template.txt' not found. Please ensure the file exists in the current directory.")
 
 
     drafts = []
