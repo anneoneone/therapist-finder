@@ -4,14 +4,14 @@ __version__ = "0.1.0"
 __author__ = "Your Name"
 __email__ = "your.email@example.com"
 
-from .models import TherapistData, UserInfo, EmailDraft
-from .parsers import PDFParser, TextParser
-from .email import EmailGenerator
 from .config import Settings
+from .email import EmailGenerator
+from .models import EmailDraft, TherapistData, UserInfo
+from .parsers import PDFParser, TextParser
 
 __all__ = [
     "TherapistData",
-    "UserInfo", 
+    "UserInfo",
     "EmailDraft",
     "PDFParser",
     "TextParser",

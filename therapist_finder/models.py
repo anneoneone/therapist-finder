@@ -1,19 +1,19 @@
 """Data models for therapist finder application."""
 
-from typing import List, Optional
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 
 
 class UserInfo(BaseModel):
     """User information for email generation."""
-    
+
     name: str
     email: str  # Temporarily using str instead of EmailStr
     telefon: str
     address: str
     vermittlungscode: str
-    
-    @validator('name', 'telefon', 'address', 'vermittlungscode')
+
+    @field_validator("name", "telefon", "address", "vermittlungscode")
+    @classmethod
     def not_empty(cls, v: str) -> str:
         """Ensure fields are not empty."""
         if not v or not v.strip():
@@ -23,27 +23,28 @@ class UserInfo(BaseModel):
 
 class TherapistData(BaseModel):
     """Therapist information parsed from documents."""
-    
+
     name: str
-    address: Optional[str] = None
-    telefon: Optional[str] = None
-    email: Optional[str] = None
-    therapieform: List[str] = []
-    sprechzeiten: List[str] = []
-    salutation: Optional[str] = None
-    
-    @validator('name')
+    address: str | None = None
+    telefon: str | None = None
+    email: str | None = None
+    therapieform: list[str] = []
+    sprechzeiten: list[str] = []
+    salutation: str | None = None
+
+    @field_validator("name")
+    @classmethod
     def name_not_empty(cls, v: str) -> str:
         """Ensure name is not empty."""
         if not v or not v.strip():
             raise ValueError("Name cannot be empty")
         return v.strip()
-    
+
     @property
     def has_contact_info(self) -> bool:
         """Check if therapist has any contact information."""
         return bool(self.email or self.telefon)
-    
+
     @property
     def full_address(self) -> str:
         """Get formatted full address."""
@@ -52,13 +53,14 @@ class TherapistData(BaseModel):
 
 class EmailDraft(BaseModel):
     """Email draft for contacting therapists."""
-    
+
     to: str
     subject: str
     body: str
     therapist_name: str
-    
-    @validator('subject', 'body')
+
+    @field_validator("subject", "body")
+    @classmethod
     def not_empty(cls, v: str) -> str:
         """Ensure fields are not empty."""
         if not v or not v.strip():
@@ -68,23 +70,25 @@ class EmailDraft(BaseModel):
 
 class ParsingStatistics(BaseModel):
     """Statistics from parsing operation."""
-    
+
     total_entries: int
     entries_with_email: int
     entries_with_phone: int
     entries_with_both: int
-    
+
     @property
     def entries_without_email(self) -> int:
         """Number of entries without email."""
         return self.total_entries - self.entries_with_email
-    
+
     @property
     def entries_without_phone(self) -> int:
         """Number of entries without phone."""
         return self.total_entries - self.entries_with_phone
-    
+
     @property
     def contactable_entries(self) -> int:
         """Number of entries with at least one contact method."""
-        return self.entries_with_email + self.entries_with_phone - self.entries_with_both
+        return (
+            self.entries_with_email + self.entries_with_phone - self.entries_with_both
+        )

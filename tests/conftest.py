@@ -1,9 +1,11 @@
 """Pytest configuration and fixtures."""
 
-import pytest
 from pathlib import Path
+
+import pytest
+
 from therapist_finder.config import Settings
-from therapist_finder.models import UserInfo, TherapistData
+from therapist_finder.models import TherapistData, UserInfo
 
 
 @pytest.fixture
@@ -14,7 +16,7 @@ def test_settings():
         output_directory=Path("test_clients"),
         default_subject="Test Subject",
         max_address_parts=2,
-        json_indent=2
+        json_indent=2,
     )
 
 
@@ -26,7 +28,7 @@ def sample_user_info():
         email="max@example.com",
         telefon="0123456789",
         address="Musterstraße 1, 12345 Berlin",
-        vermittlungscode="TEST-123"
+        vermittlungscode="TEST-123",
     )
 
 
@@ -40,5 +42,5 @@ def sample_therapist():
         email="dr.beispiel@example.com",
         therapieform=["Verhaltenstherapie"],
         sprechzeiten=["Mo-Fr 9-17 Uhr"],
-        salutation="Sehr geehrte Frau Dr. Beispiel"
+        salutation="Sehr geehrte Frau Dr. Beispiel",
     )
