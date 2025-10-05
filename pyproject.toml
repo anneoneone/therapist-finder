@@ -1,0 +1,101 @@
+[tool.poetry]
+name = "therapist-finder"
+version = "0.1.0"
+description = "A tool for parsing therapist data and generating email drafts"
+authors = ["Your Name <your.email@example.com>"]
+readme = "README.md"
+packages = [{include = "therapist_finder"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+typer = {extras = ["all"], version = "^0.19.0"}
+pydantic = "^2.11.0"
+pydantic-settings = "^2.6.0"
+pdfplumber = "^0.10.0"
+rich = "^13.9.0"
+# MCP and web fetching
+mcp = "^1.1.0"
+httpx = "^0.27.0"
+beautifulsoup4 = "^4.12.0"
+lxml = "^5.0.0"
+requests = "^2.32.0"
+mcp-server-fetch = "^2025.4.7"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.0"
+pytest-cov = "^6.0.0"
+black = "^24.10.0"
+ruff = "^0.8.0"
+mypy = "^1.13.0"
+pre-commit = "^4.0.0"
+bandit = "^1.8.6"
+pydocstyle = "^6.3.0"
+types-requests = "^2.32.4.20250913"
+tomli = "^2.2.1"
+
+[tool.poetry.scripts]
+therapist-finder = "therapist_finder.cli:app"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+include = '\.pyi?$'
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501", # line too long, handled by black
+    "B008", # do not perform function calls in argument defaults
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["therapist_finder"]
+force-single-line = false
+force-sort-within-sections = true
+single-line-exclusions = ["typing"]
+
+[tool.mypy]
+python_version = "3.10"
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = ["pdfplumber", "PyPDF2"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers --strict-config"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.pydocstyle]
+inherit = false
+convention = "google"
+match = "(?!test_).*\\.py"
+add-ignore = ["D202"]
