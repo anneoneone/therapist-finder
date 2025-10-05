@@ -28,6 +28,10 @@ black = "^24.10.0"
 ruff = "^0.8.0"
 mypy = "^1.13.0"
 pre-commit = "^4.0.0"
+bandit = "^1.8.6"
+pydocstyle = "^6.3.0"
+types-requests = "^2.32.4.20250913"
+tomli = "^2.2.1"
 
 [tool.poetry.scripts]
 therapist-finder = "therapist_finder.cli:app"
@@ -42,6 +46,10 @@ target-version = ['py310']
 include = '\.pyi?$'
 
 [tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -55,11 +63,15 @@ ignore = [
     "E501", # line too long, handled by black
     "B008", # do not perform function calls in argument defaults
 ]
-line-length = 88
-target-version = "py39"
+
+[tool.ruff.lint.isort]
+known-first-party = ["therapist_finder"]
+force-single-line = false
+force-sort-within-sections = true
+single-line-exclusions = ["typing"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 check_untyped_defs = true
 disallow_any_generics = true
 disallow_incomplete_defs = true
@@ -70,6 +82,10 @@ warn_unused_ignores = true
 warn_return_any = true
 strict_equality = true
 
+[[tool.mypy.overrides]]
+module = ["pdfplumber", "PyPDF2"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-ra -q --strict-markers --strict-config"
@@ -77,3 +93,9 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+
+[tool.pydocstyle]
+inherit = false
+convention = "google"
+match = "(?!test_).*\\.py"
+add-ignore = ["D202"]
