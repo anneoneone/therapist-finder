@@ -1,0 +1,13 @@
+{
+  "name": "therapist-finder-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for Therapist Finder",
+  "type": "module",
+  "scripts": {
+    "dev": "npx serve -p 3000",
+    "preview": "npx serve -p 3000"
+  },
+  "devDependencies": {
+    "serve": "^14.2.0"
+  }
+}

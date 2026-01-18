@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Therapist Finder</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="container">
+                <h1 class="logo">🔍 Therapist Finder</h1>
+                <p class="tagline">Parse therapist data and generate personalized emails</p>
+            </div>
+        </header>
+
+        <main class="main container">
+            <!-- Step 1: Upload -->
+            <section class="card" id="upload-section">
+                <div class="card-header">
+                    <span class="step-badge">1</span>
+                    <h2>Upload Therapist List</h2>
+                </div>
+                <div class="card-body">
+                    <div class="dropzone" id="dropzone">
+                        <input type="file" id="file-input" accept=".pdf,.txt" hidden>
+                        <div class="dropzone-content">
+                            <span class="dropzone-icon">📄</span>
+                            <p class="dropzone-text">Drag & drop your PDF or text file here</p>
+                            <p class="dropzone-hint">or click to browse</p>
+                        </div>
+                        <div class="dropzone-file" id="selected-file" hidden>
+                            <span class="file-icon">📎</span>
+                            <span class="file-name" id="file-name"></span>
+                            <button class="btn-icon" id="remove-file" title="Remove file">✕</button>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary btn-lg" id="upload-btn" disabled>
+                        <span class="btn-text">Parse File</span>
+                        <span class="btn-loader" hidden></span>
+                    </button>
+                    <div class="status" id="upload-status" hidden></div>
+                </div>
+            </section>
+
+            <!-- Step 2: User Info -->
+            <section class="card" id="userinfo-section" hidden>
+                <div class="card-header">
+                    <span class="step-badge">2</span>
+                    <h2>Your Information</h2>
+                </div>
+                <div class="card-body">
+                    <form id="userinfo-form" class="form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="first-name">First Name *</label>
+                                <input type="text" id="first-name" name="first_name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="last-name">Last Name *</label>
+                                <input type="text" id="last-name" name="last_name" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="birth-date">Birth Date</label>
+                                <input type="text" id="birth-date" name="birth_date" placeholder="DD.MM.YYYY">
+                            </div>
+                            <div class="form-group">
+                                <label for="insurance">Health Insurance</label>
+                                <input type="text" id="insurance" name="insurance" placeholder="e.g., TK, AOK">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="email">Email</label>
+                                <input type="email" id="email" name="email">
+                            </div>
+                            <div class="form-group">
+                                <label for="phone">Phone</label>
+                                <input type="tel" id="phone" name="phone">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <span class="btn-text">Generate Emails</span>
+                            <span class="btn-loader" hidden></span>
+                        </button>
+                    </form>
+                    <div class="status" id="generate-status" hidden></div>
+                </div>
+            </section>
+
+            <!-- Step 3: Results -->
+            <section class="card" id="results-section" hidden>
+                <div class="card-header">
+                    <span class="step-badge">3</span>
+                    <h2>Results</h2>
+                    <div class="card-actions">
+                        <button class="btn btn-secondary" id="download-table">
+                            📊 Download Table
+                        </button>
+                        <button class="btn btn-primary" id="download-applescript">
+                            🍎 Download AppleScript
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="results-summary" id="results-summary"></div>
+                    <div class="table-container">
+                        <table class="table" id="therapists-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>Address</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="therapists-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <div class="container">
+                <p>Therapist Finder — Made for finding the right therapist</p>
+            </div>
+        </footer>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

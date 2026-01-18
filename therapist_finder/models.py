@@ -7,17 +7,17 @@ class UserInfo(BaseModel):
     """User information for email generation."""
 
     name: str
-    email: str  # Temporarily using str instead of EmailStr
-    telefon: str
-    address: str
-    vermittlungscode: str
+    email: str = ""  # Optional email
+    telefon: str = ""  # Optional phone
+    address: str = ""  # Optional address
+    vermittlungscode: str = ""  # Optional referral code
 
-    @field_validator("name", "telefon", "address", "vermittlungscode")
+    @field_validator("name")
     @classmethod
-    def not_empty(cls, v: str) -> str:
-        """Ensure fields are not empty."""
+    def name_not_empty(cls, v: str) -> str:
+        """Ensure name is not empty."""
         if not v or not v.strip():
-            raise ValueError("Field cannot be empty")
+            raise ValueError("Name cannot be empty")
         return v.strip()
 
 
