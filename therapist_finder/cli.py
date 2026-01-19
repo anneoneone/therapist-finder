@@ -154,5 +154,90 @@ def show_statistics(
     console.print(table)
 
 
+@app.command()
+def search_116117(
+    specialty: str = typer.Option("Psychotherapeut", "--specialty", "-s", help="Therapist specialty"),
+    location: str = typer.Option(..., "--location", "-l", help="City or postal code"),
+    radius: int = typer.Option(25, "--radius", "-r", help="Search radius in km"),
+    max_results: int = typer.Option(50, "--max", "-m", help="Maximum results"),
+    output_dir: Path | None = typer.Option(None, "--output", help="Output directory"),
+) -> None:
+    """Search for therapists using arztsuche.116117.de API."""
+    try:
+        from .parsers.arztsuche_api import Arztsuche116117Client, SearchParams
+    except ImportError:
+        rprint("[red]Error: httpx is required for API access. Install with: poetry add httpx[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"\n[bold blue]Searching for {specialty} in {location}...[/bold blue]")
+
+    # Create search parameters
+    params = SearchParams(
+        specialty=specialty,
+        location=location,
+        radius=radius,
+        max_results=max_results,
+    )
+
+    # Search using API
+    try:
+        with Arztsuche116117Client() as client:
+            therapists = client.search_therapists(params)
+    except Exception as e:
+        rprint(f"[red]Error: API request failed: {e}[/red]")
+        raise typer.Exit(1)
+
+    if not therapists:
+        rprint("[yellow]No therapists found[/yellow]")
+        raise typer.Exit(0)
+
+    # Display results
+    table = Table(title=f"Found {len(therapists)} therapists")
+    table.add_column("Name", style="cyan")
+    table.add_column("Address", style="green")
+    table.add_column("Phone", style="yellow")
+    table.add_column("Distance", style="magenta")
+
+    for t in therapists:
+        address = f"{t.street or ''}, {t.postal_code or ''} {t.city or ''}".strip(", ")
+        distance = f"{t.distance:.1f} km" if t.distance else "-"
+        table.add_row(t.name, address, t.phone or "-", distance)
+
+    console.print("\n")
+    console.print(table)
+
+    # Save results if output directory specified
+    if output_dir:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Convert to TherapistData format
+        from .models import Therapist
+        
+        therapist_list = []
+        for t in therapists:
+            therapist_list.append(
+                Therapist(
+                    name=t.name,
+                    street=t.street or "",
+                    city=t.city or "",
+                    postal_code=t.postal_code or "",
+                    phone=t.phone or "",
+                    email=t.email or "",
+                )
+            )
+        
+        data = TherapistData(therapists=therapist_list)
+        
+        json_path = output_dir / "therapists_116117.json"
+        md_path = output_dir / "therapists_116117.md"
+        
+        save_json(data, json_path)
+        save_markdown(data, md_path)
+        
+        console.print(f"\n[green]✓ Results saved to:[/green]")
+        console.print(f"  JSON: {json_path}")
+        console.print(f"  Markdown: {md_path}")
+
+
 if __name__ == "__main__":
     app()
