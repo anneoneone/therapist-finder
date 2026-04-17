@@ -3,7 +3,10 @@
  * @module api
  */
 
-const API_BASE = '/api';
+// Override via `window.API_BASE = 'https://your-api.onrender.com/api'` before
+// this module loads (e.g. in a <script> tag in index.html) when the frontend
+// is hosted on a different origin than the backend.
+const API_BASE = (typeof window !== 'undefined' && window.API_BASE) || '/api';
 
 /**
  * Custom error class for API errors.
