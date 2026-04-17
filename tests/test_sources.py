@@ -10,7 +10,6 @@ import pytest
 from pytest_httpx import HTTPXMock
 
 from therapist_finder.models import TherapistData
-from therapist_finder.sources.arztauskunft_berlin import ArztauskunftBerlinSource
 from therapist_finder.sources.base import SearchParams
 from therapist_finder.sources.geocode import (
     Geocoder,
@@ -19,7 +18,8 @@ from therapist_finder.sources.geocode import (
 )
 from therapist_finder.sources.merger import merge_and_rank
 from therapist_finder.sources.overpass import OverpassSource
-from therapist_finder.sources.ptk_berlin import PTKBerlinSource
+from therapist_finder.sources.psych_info import PsychInfoSource
+from therapist_finder.sources.therapie_de import TherapieDeSource
 
 FIXTURES = Path(__file__).parent / "fixtures" / "sources"
 UA = "therapist-finder-tests/0.0"
@@ -76,37 +76,36 @@ class TestOverpassSource:
         assert first.sources == ["osm"]
 
 
-class TestPTKBerlinSource:
-    """Tests for the PTK Berlin HTML scraper."""
+class TestPsychInfoSource:
+    """Tests for the psych-info.de HTML scraper (residential only)."""
 
     def test_parses_list_and_detail(
         self, httpx_mock: HTTPXMock, search_params: SearchParams
     ) -> None:
         """List + detail pages combine into a populated ``TherapistData``."""
         httpx_mock.add_response(
-            url="https://ptk.example/robots.txt", method="GET", text=""
+            url="https://psych.example/robots.txt", method="GET", text=""
         )
         httpx_mock.add_response(
-            url="https://ptk.example/search?ort=Berlin&seite=1&verfahren=PP",
+            url="https://psych.example/suche?ort=Berlin&verfahren=PP&seite=1",
             method="GET",
-            text=_read("ptk_list.html"),
+            text=_read("psych_info_list.html"),
         )
         httpx_mock.add_response(
-            url="https://ptk.example/therapeut/anna-beispiel",
+            url="https://psych.example/therapeut/anna-beispiel",
             method="GET",
-            text=_read("ptk_detail.html"),
+            text=_read("psych_info_detail.html"),
         )
         httpx_mock.add_response(
-            url="https://ptk.example/therapeut/clara-kollege",
+            url="https://psych.example/therapeut/clara-kollege",
             method="GET",
-            text=_read("ptk_detail.html"),
+            text=_read("psych_info_detail.html"),
         )
         search_params.limit_per_source = 2
 
-        src = PTKBerlinSource(
+        src = PsychInfoSource(
             user_agent=UA,
-            base_url="https://ptk.example",
-            search_path="/search",
+            base_url="https://psych.example",
             min_delay_seconds=0.0,
         )
         try:
@@ -115,27 +114,27 @@ class TestPTKBerlinSource:
             src.close()
 
         assert len(results) == 2
-        assert results[0].name == "Dr. Anna Beispiel"
-        assert results[0].email == "praxis@beispiel.de"
-        assert results[0].website == "https://praxis-beispiel.de"
-        assert "Verhaltenstherapie" in results[0].therapieform
-        assert results[0].languages == ["Deutsch", "Englisch"]
-        assert results[0].insurance_type == "both"
-        assert results[0].sources == ["ptk"]
+        first = results[0]
+        assert first.name == "Dr. Anna Beispiel"
+        assert first.email == "praxis@beispiel.de"
+        assert first.website == "https://praxis-beispiel.de"
+        assert "Verhaltenstherapie" in first.therapieform
+        assert first.languages == ["Deutsch", "Englisch"]
+        assert first.insurance_type == "privat"
+        assert first.sources == ["psych_info"]
 
     def test_respects_robots_txt(
         self, httpx_mock: HTTPXMock, search_params: SearchParams
     ) -> None:
         """A Disallow: / robots.txt blocks all fetching."""
         httpx_mock.add_response(
-            url="https://ptk.example/robots.txt",
+            url="https://psych.example/robots.txt",
             method="GET",
             text="User-agent: *\nDisallow: /\n",
         )
-        src = PTKBerlinSource(
+        src = PsychInfoSource(
             user_agent=UA,
-            base_url="https://ptk.example",
-            search_path="/search",
+            base_url="https://psych.example",
             min_delay_seconds=0.0,
         )
         try:
@@ -144,33 +143,37 @@ class TestPTKBerlinSource:
             src.close()
 
 
-class TestArztauskunftBerlinSource:
-    """Tests for the Ärztekammer Berlin HTML scraper."""
+class TestTherapieDeSource:
+    """Tests for the therapie.de HTML scraper (residential only)."""
 
-    def test_parses_list_and_detail(
+    def test_parses_and_flags_heilpraktiker(
         self, httpx_mock: HTTPXMock, search_params: SearchParams
     ) -> None:
-        """Specialty param maps to 'Psychiatrie' and detail fields populate."""
+        """Detail text with 'Heilpraktikerin' → insurance_type 'heilpraktiker'."""
         httpx_mock.add_response(
-            url="https://aeka.example/robots.txt", method="GET", text=""
+            url="https://therapiede.example/robots.txt", method="GET", text=""
         )
         httpx_mock.add_response(
-            url="https://aeka.example/suche?fachgebiet=Psychiatrie&ort=Berlin&seite=1",
+            url="https://therapiede.example/psychotherapie/-ort-/berlin/",
             method="GET",
-            text=_read("aeka_list.html"),
+            text=_read("therapie_de_list.html"),
         )
         httpx_mock.add_response(
-            url="https://aeka.example/arzt/bernd-muster",
+            url="https://therapiede.example/therapeut/mia-mueller",
             method="GET",
-            text=_read("aeka_detail.html"),
+            text=_read("therapie_de_detail.html"),
         )
-        search_params.specialty = "Psychiater"
-        search_params.limit_per_source = 1
+        httpx_mock.add_response(
+            url="https://therapiede.example/therapeut/lea-lotus",
+            method="GET",
+            text=_read("therapie_de_detail.html"),
+        )
+        search_params.limit_per_source = 2
 
-        src = ArztauskunftBerlinSource(
+        src = TherapieDeSource(
             user_agent=UA,
-            base_url="https://aeka.example",
-            search_path="/suche",
+            base_url="https://therapiede.example",
+            listing_path="/psychotherapie/-ort-/berlin",
             min_delay_seconds=0.0,
         )
         try:
@@ -178,12 +181,14 @@ class TestArztauskunftBerlinSource:
         finally:
             src.close()
 
-        assert len(results) == 1
-        entry = results[0]
-        assert entry.name == "Dr. med. Bernd Muster"
-        assert entry.email == "bernd@muster-praxis.de"
-        assert "Psychiatrie" in entry.therapieform
-        assert entry.sources == ["aeka"]
+        assert len(results) == 2
+        heilpraktikerin = next(
+            r for r in results if "Lotus" in r.name
+        )
+        assert heilpraktikerin.insurance_type == "heilpraktiker"
+        assert heilpraktikerin.email == "kontakt@lotus-praxis.de"
+        assert heilpraktikerin.website == "https://lotus-praxis.de"
+        assert heilpraktikerin.sources == ["therapie_de"]
 
 
 class TestGeocoder:

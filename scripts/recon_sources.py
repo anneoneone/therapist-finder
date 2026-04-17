@@ -141,21 +141,25 @@ class Target:
 
 
 DEFAULT_TARGETS = [
-    Target(
-        "ptk_berlin",
-        "https://www.psychotherapeutenkammer-berlin.de/psychotherapeutensuche",
-    ),
+    # Verified real URLs. Note: psychotherapeutenkammer-berlin.de delegates
+    # its search to psych-info.de, and aekb.de + kvberlin.de overlap 116117,
+    # so psych_info and therapie_de are the main targets worth probing for
+    # JSON APIs.
     Target(
         "psych_info",
-        "https://www.psych-info.de/psychotherapeutensuche/",
+        "https://psych-info.de/",
     ),
     Target(
-        "aeka_berlin",
-        "https://www.arztauskunft-berlin.de/",
+        "therapie_de",
+        "https://www.therapie.de/psychotherapie/-ort-/berlin/",
     ),
     Target(
-        "kv_berlin",
-        "https://www.kvberlin.de/fuer-patienten/arzt-und-psychotherapeutensuche",
+        "ptk_berlin",
+        "https://www.psychotherapeutenkammer-berlin.de/psychotherapeutinnensuche",
+    ),
+    Target(
+        "aekb",
+        "https://www.aekb.de/patient-innen/suche-nach-aerztinnen",
     ),
 ]
 

@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, field_validator
 
-InsuranceType = Literal["kassen", "privat", "both"]
+InsuranceType = Literal["kassen", "privat", "both", "heilpraktiker"]
 
 
 class UserInfo(BaseModel):
