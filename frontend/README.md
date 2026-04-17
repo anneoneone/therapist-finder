@@ -7,7 +7,10 @@ A modern, simple frontend for Therapist Finder built with vanilla JavaScript and
 - **File Upload**: Drag & drop or click to upload PDF/text files
 - **User Info Form**: Collect user information for email personalization
 - **Results Table**: Display parsed therapists with status indicators
-- **Downloads**: Export CSV table and AppleScript file
+- **CSV Export**: Download the therapist table as CSV
+- **Email Draft Queue**: Sequential `mailto:` flow that opens one pre-filled draft
+  at a time in the user's default mail client (works on Windows, macOS, Linux).
+  Contacted addresses are remembered in `localStorage` and skipped on reruns.
 
 ## Structure
 
@@ -48,7 +51,7 @@ The frontend expects these API endpoints:
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/api/therapists/parse` | Upload file, returns parsed therapists |
-| `POST` | `/api/emails/generate` | Generate emails, returns drafts + AppleScript |
+| `POST` | `/api/emails/generate` | Generate emails, returns drafts + CSV |
 | `GET` | `/api/health` | Health check |
 
 ### Request: Parse File
@@ -94,10 +97,11 @@ FormData { file: File }
     {
       "to": "m.schmidt@example.com",
       "subject": "Anfrage Psychotherapie",
-      "body": "..."
+      "body": "...",
+      "therapist_name": "Dr. Maria Schmidt"
     }
   ],
-  "applescript": "tell application \"Mail\"..."
+  "table_csv": "Name,Email,Phone,Address\n..."
 }
 ```
 

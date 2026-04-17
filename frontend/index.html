@@ -104,8 +104,8 @@
                         <button class="btn btn-secondary" id="download-table">
                             📊 Download Table
                         </button>
-                        <button class="btn btn-primary" id="download-applescript">
-                            🍎 Download AppleScript
+                        <button class="btn btn-primary" id="open-queue">
+                            📬 Open Email Drafts
                         </button>
                     </div>
                 </div>
@@ -129,6 +129,43 @@
                 </div>
             </section>
         </main>
+
+        <!-- Email draft queue modal -->
+        <div class="queue-overlay" id="queue-overlay" hidden>
+            <div class="queue-modal" role="dialog" aria-modal="true" aria-labelledby="queue-title">
+                <header class="queue-header">
+                    <h3 id="queue-title">
+                        Contact therapist
+                        <span id="queue-position">1</span> of <span id="queue-total">1</span>
+                    </h3>
+                    <button class="btn-icon" id="queue-close" title="Close" aria-label="Close">✕</button>
+                </header>
+                <div class="queue-body">
+                    <div class="queue-therapist" id="queue-therapist"></div>
+                    <div class="queue-preview">
+                        <div class="queue-preview-row">
+                            <span class="queue-preview-label">Subject</span>
+                            <span id="queue-subject"></span>
+                        </div>
+                        <div class="queue-preview-row queue-preview-body">
+                            <span class="queue-preview-label">Body</span>
+                            <pre id="queue-body-preview"></pre>
+                        </div>
+                    </div>
+                    <div class="queue-warning" id="queue-truncation-warning" hidden>
+                        ⚠️ This email is long and may be cut off when your mail app opens it.
+                        Use <strong>Copy body</strong> to paste the full text into the compose window.
+                    </div>
+                    <div class="status" id="queue-status" hidden></div>
+                </div>
+                <footer class="queue-actions">
+                    <button class="btn btn-secondary" id="queue-copy-body">📋 Copy body</button>
+                    <button class="btn btn-secondary" id="queue-skip">Skip</button>
+                    <button class="btn btn-primary" id="queue-open">📧 Open in mail app</button>
+                    <button class="btn btn-primary" id="queue-next" disabled>Next →</button>
+                </footer>
+            </div>
+        </div>
 
         <footer class="footer">
             <div class="container">

@@ -58,7 +58,6 @@ class GenerateResponse(BaseModel):
     """Response from generate endpoint."""
 
     drafts: list[EmailDraftResponse]
-    applescript: str
     table_csv: str
 
 
