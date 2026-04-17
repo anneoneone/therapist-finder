@@ -60,9 +60,7 @@ class Geocoder:
         self._rate_limiter = RateLimiter(min_delay_seconds=1.0)
         self._host = urlparse(endpoint).netloc
 
-    def geocode(
-        self, address: str, *, require_berlin: bool = True
-    ) -> Location:
+    def geocode(self, address: str, *, require_berlin: bool = True) -> Location:
         """Geocode ``address`` using Nominatim.
 
         Raises:
@@ -97,8 +95,7 @@ class Geocoder:
         lon = float(top["lon"])
         if require_berlin and not _is_in_berlin(lat, lon):
             raise GeocodingError(
-                f"Address {address!r} geocoded outside Berlin "
-                f"(lat={lat}, lon={lon})"
+                f"Address {address!r} geocoded outside Berlin (lat={lat}, lon={lon})"
             )
         return Location(
             lat=lat,

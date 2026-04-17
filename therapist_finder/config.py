@@ -43,16 +43,26 @@ class Settings(BaseSettings):
 
     # Source / scraper settings
     enabled_sources: list[str] = Field(
-        default_factory=lambda: ["116117", "osm", "ptk", "aeka"],
-        description="Default data sources for crawl-berlin",
+        default_factory=lambda: ["116117", "osm"],
+        description=(
+            "Default data sources for crawl-berlin. "
+            "CI-safe; residential-only sources (psych_info, therapie_de) "
+            "must be opted into explicitly."
+        ),
+    )
+    residential_only_sources: list[str] = Field(
+        default_factory=lambda: ["psych_info", "therapie_de"],
+        description=(
+            "Sources that only work from residential IPs. Enabling them "
+            "from cloud / CI runners will return empty results."
+        ),
     )
     default_max_results: int = Field(
         default=20, description="Default N closest providers to return"
     )
     scraper_user_agent: str = Field(
         default=(
-            "therapist-finder/0.1 "
-            "(+https://github.com/anneoneone/therapist-finder)"
+            "therapist-finder/0.1 (+https://github.com/anneoneone/therapist-finder)"
         ),
         description="User-Agent sent by scrapers and geocoder",
     )

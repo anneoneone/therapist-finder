@@ -278,9 +278,13 @@ def crawl_berlin(
         15.0, "--radius", "-r", help="Per-source search radius in km"
     ),
     sources: str = typer.Option(
-        "116117,osm,ptk,aeka",
+        "116117,osm",
         "--sources",
-        help="Comma-separated source names to query",
+        help=(
+            "Comma-separated source names. Default is CI-safe (116117,osm). "
+            "Residential-only sources (psych_info, therapie_de) require a "
+            "laptop / residential IP."
+        ),
     ),
     output_dir: Path | None = typer.Option(
         None, "--output", help="Directory to write merged JSON + Markdown to"
@@ -363,14 +367,24 @@ def crawl_berlin(
 
 
 def _build_sources(requested: list[str], settings: Settings) -> list[_SourceLike]:
-    """Instantiate the sources requested on the CLI (ignores unknown names)."""
-    from .parsers.arztsuche_api import Arztsuche116117Source
-    from .sources.arztauskunft_berlin import ArztauskunftBerlinSource
-    from .sources.overpass import OverpassSource
-    from .sources.ptk_berlin import PTKBerlinSource
+    """Instantiate the sources requested on the CLI (ignores unknown names).
 
+    Residential-only sources (``psych_info``, ``therapie_de``) are instantiated
+    on request but emit a warning because cloud runners will be WAF-blocked.
+    """
+    from .parsers.arztsuche_api import Arztsuche116117Source
+    from .sources.overpass import OverpassSource
+    from .sources.psych_info import PsychInfoSource
+    from .sources.therapie_de import TherapieDeSource
+
+    residential = set(settings.residential_only_sources)
     instances: list[_SourceLike] = []
     for name in requested:
+        if name in residential:
+            rprint(
+                f"[yellow]⚠ {name} is residential-only — cloud / CI runs "
+                f"are usually WAF-blocked[/yellow]"
+            )
         if name == "116117":
             instances.append(Arztsuche116117Source())
         elif name == "osm":
@@ -380,18 +394,18 @@ def _build_sources(requested: list[str], settings: Settings) -> list[_SourceLike
                     user_agent=settings.scraper_user_agent,
                 )
             )
-        elif name == "ptk":
+        elif name == "psych_info":
             instances.append(
-                PTKBerlinSource(
+                PsychInfoSource(
                     user_agent=settings.scraper_user_agent,
                     min_delay_seconds=settings.scraper_min_delay_seconds,
                 )
             )
-        elif name == "aeka":
+        elif name == "therapie_de":
             instances.append(
-                ArztauskunftBerlinSource(
+                TherapieDeSource(
                     user_agent=settings.scraper_user_agent,
-                    min_delay_seconds=settings.scraper_min_delay_seconds,
+                    min_delay_seconds=max(settings.scraper_min_delay_seconds, 3.0),
                 )
             )
         else:

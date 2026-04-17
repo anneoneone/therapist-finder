@@ -1,19 +1,51 @@
 # Data Sources for Berlin Healthcare Providers
 
-The `crawl-berlin` command aggregates providers from several public Berlin
-directories. Given a street address, it geocodes it, queries each enabled
-source within a radius, merges duplicates across sources, and returns the
-**N closest providers** ranked by haversine distance.
+The `crawl-berlin` command aggregates providers from several directories.
+Given a street address, it geocodes it, queries each enabled source within
+a radius, merges duplicates across sources, and returns the **N closest
+providers** ranked by haversine distance.
+
+## Quick reference
+
+| Name          | Directory                               | Access       | Coverage gain                                  |
+|---------------|-----------------------------------------|--------------|------------------------------------------------|
+| `116117`      | KBV Arztsuche (`arztsuche.116117.de`)   | Public API   | All Kassensitz providers (baseline)            |
+| `osm`         | OpenStreetMap Overpass                  | Free ODbL    | Crowdsourced, incl. some private-pay practices |
+| `psych_info`  | `psych-info.de` (voluntary chamber reg.) | **Residential only** | Private-only Approbierte that 116117 misses |
+| `therapie_de` | `therapie.de` Berlin listing            | **Residential only** | Heilpraktiker (HP-Psychotherapie) + private   |
+
+The first two work from anywhere and are the defaults. The last two require
+a residential IP — every test run from a cloud / GitHub Actions runner was
+WAF-blocked (`"Sie haben leider keinen Zugriff auf diese Seite"`).
+
+**Skipped on purpose:**
+
+- **PTK Berlin** delegates its search to psych-info.de, so wrapping it was
+  redundant.
+- **Ärztekammer Berlin / KV Berlin** overlap 100% with 116117 for Kassensitz
+  providers.
+- **Doctolib** is DataDome-protected and ToS-hostile (residential IP alone
+  isn't enough).
+- **Jameda** AGB explicitly bans automated extraction with litigation history.
 
 ## Usage
+
+Default (CI-safe, works from anywhere):
 
 ```bash
 poetry run therapist-finder crawl-berlin \
   --address "Kastanienallee 12, 10435 Berlin" \
   --max 20 \
-  --specialty "Psychotherapeut" \
-  --radius 15 \
-  --sources 116117,osm,ptk,aeka \
+  --output clients/anna/
+```
+
+Full coverage (run from your laptop, not in CI):
+
+```bash
+poetry run therapist-finder crawl-berlin \
+  --address "Kastanienallee 12, 10435 Berlin" \
+  --max 20 \
+  --sources 116117,osm,psych_info,therapie_de \
   --output clients/anna/
 ```
 
@@ -22,48 +54,44 @@ Output files (when `--output` is given):
 - `therapists_nearest.json` — full merged records, sorted by `distance_km`.
 - `therapists_nearest.md` — Markdown table preview.
 
-## Sources
-
-| Name     | Directory                                        | Coverage                          | Legal                 |
-|----------|--------------------------------------------------|-----------------------------------|-----------------------|
-| `116117` | KBV Arztsuche (`arztsuche.116117.de`)            | KV-accredited (Kassensitz)        | Public API            |
-| `osm`    | OpenStreetMap Overpass API                       | Crowdsourced, incl. private       | ODbL                  |
-| `ptk`    | Psychotherapeutenkammer Berlin register          | All licensed Psychotherapists     | Public statutory reg. |
-| `aeka`   | Ärztekammer Berlin (`arztauskunft-berlin.de`)    | MDs incl. psychiatrists           | Public statutory reg. |
-
-Commercial directories (Jameda, Doctolib, Therapie.de) are intentionally
-excluded: their ToS explicitly prohibit automated extraction.
-
 ## Behaviour
 
-- Each source is queried in parallel with a 2 s per-host delay for scrapers.
-- HTML scrapers honour `robots.txt` by default.
-- Geocoding uses Nominatim with an identifying User-Agent and 1 rps rate limit.
-  Responses are cached to `.cache/therapist-finder/` to avoid re-hitting
-  Nominatim during development.
+- Each source is queried in parallel.
+- HTML scrapers honour `robots.txt` by default, use an identifying
+  User-Agent, and pace requests (≥2 s/host for psych-info, ≥3 s/host for
+  therapie.de).
+- Geocoding uses Nominatim (1 rps, identifying UA) and is disk-cached.
 - Deduplication matches by normalised last name + postcode + house number,
-  falling back to email. Merged records union their non-null fields and record
-  all contributing sources in `sources`.
+  falling back to email. Merged records union their non-null fields and
+  record all contributing sources in `sources`.
+- **Legal hygiene for therapie.de**: §87b UrhG (German DB-right) protects
+  "wesentliche Teile" of a database. Store only fields you display, cap
+  request rates, and never republish the raw corpus.
+
+## Why the Kammer scrapers were removed
+
+An earlier iteration shipped `PTKBerlinSource` + `ArztauskunftBerlinSource`.
+The recon (see `scripts/recon_sources.py`) confirmed:
+
+1. `psychotherapeutenkammer-berlin.de` WAF-blocks cloud IPs and its
+   `Psychotherapeut:innensuche` is in fact a frontend for psych-info.de.
+2. `arztauskunft-berlin.de` wasn't a real domain — the Ärztekammer's doctor
+   search lives at `aekb.de` / `bundesaerztekammer.de/arztsuche` and
+   substantially overlaps 116117.
+3. `kvberlin.de` uses the same KBV feed as 116117.
+
+So the useful additions for Berlin are psych-info.de (for private-pay
+psychotherapists) and therapie.de (for Heilpraktiker). Both are residential
+only.
 
 ## Finding hidden JSON APIs (recon)
 
-The PTK Berlin and Ärztekammer Berlin scrapers use best-effort CSS selectors
-because their HTML isn't publicly documented. Before hardening them, run the
-recon script to see whether the sites are really SPAs backed by a JSON API
-(like `arztsuche.116117.de`) — if they are, replace the HTML scraper with a
-JSON client for much better reliability.
+If you suspect a site is really an SPA backed by JSON (like
+`arztsuche.116117.de`), run the recon script. It launches headless
+Chromium, enumerates forms/scripts/iframes, submits a `"Berlin"` search,
+and captures every XHR/fetch call.
 
-### Running the recon
-
-You can run the recon in CI without touching a terminal:
-
-1. Open the repo on GitHub → **Actions** → **Recon Berlin directories** →
-   **Run workflow** (optionally fill `only` or `extra`).
-2. When the job finishes, open the run — the `summary.md` content is
-   rendered inline as the job summary, and the full `recon/` folder is
-   attached as a downloadable artifact (`recon-<run-id>`).
-
-Locally:
+Locally (residential IP — the recommended path):
 
 ```bash
 poetry install --with dev
@@ -71,49 +99,29 @@ poetry run playwright install chromium
 poetry run python scripts/recon_sources.py
 ```
 
+Or trigger the **Recon Berlin directories** GitHub Actions workflow — the
+run summary and `recon/` artifact capture each site's form and script
+structure. Be aware that the Kammer sites will likely return "Zugriff
+verweigert" from CI IPs; residential runs give real data.
+
 Optional flags:
 
 ```bash
 # Only probe specific targets
-poetry run python scripts/recon_sources.py --only ptk_berlin,psych_info
+poetry run python scripts/recon_sources.py --only psych_info,therapie_de
 
-# Add an extra target on the fly
+# Add a custom target
 poetry run python scripts/recon_sources.py \
-    --extra kbv=https://arztsuche.kbv.de/
+    --extra bak=https://www.aekb.de/patient-innen/suche-nach-aerztinnen
 ```
-
-The script launches headless Chromium, loads each target, enumerates its
-forms / scripts / iframes, submits a `"Berlin"` search, and captures every
-XHR/fetch call the page makes. Output lands in `recon/`:
-
-- `recon/summary.md` — human-readable overview of each site.
-- `recon/<site>.json` — full capture (request + response headers, bodies,
-  discovery JSON, first 20 KB of the final HTML snapshot).
-
-Look at `recon/summary.md` first — if a site lists clean `GET /api/...` or
-`POST /search` calls returning `application/json`, that's your API. Replace
-the HTML-scraping `TherapistSource` with an httpx client that posts the same
-payload; reuse the structure of `therapist_finder/parsers/arztsuche_api.py`.
-
-### Default targets
-
-| name          | URL                                                                           |
-|---------------|-------------------------------------------------------------------------------|
-| `ptk_berlin`  | `https://www.psychotherapeutenkammer-berlin.de/psychotherapeutensuche`        |
-| `psych_info`  | `https://www.psych-info.de/psychotherapeutensuche/` (used by many Landeskammern) |
-| `aeka_berlin` | `https://www.arztauskunft-berlin.de/`                                         |
-| `kv_berlin`   | `https://www.kvberlin.de/fuer-patienten/arzt-und-psychotherapeutensuche`      |
-
-Psych-Info powers the therapist search for several German Landeskammern, so
-if it exposes a JSON API, a single integration replaces `ptk_berlin` and
-extends coverage beyond Berlin.
 
 ## Configuration
 
 Override via environment variables (prefix `THERAPIST_FINDER_`) or `.env`:
 
 ```
-THERAPIST_FINDER_ENABLED_SOURCES=["116117","osm","ptk","aeka"]
+THERAPIST_FINDER_ENABLED_SOURCES=["116117","osm"]
+THERAPIST_FINDER_RESIDENTIAL_ONLY_SOURCES=["psych_info","therapie_de"]
 THERAPIST_FINDER_SCRAPER_USER_AGENT=my-org-therapist-finder/0.2 (+https://...)
 THERAPIST_FINDER_SCRAPER_MIN_DELAY_SECONDS=2.0
 THERAPIST_FINDER_OVERPASS_ENDPOINT=https://overpass-api.de/api/interpreter

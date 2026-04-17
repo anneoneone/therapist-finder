@@ -50,9 +50,17 @@ therapist-finder process --pdf path/to/therapists.pdf
 therapist-finder process --text path/to/therapists.txt
 
 # Crawl Berlin directories for the N closest providers to an address
+# (default sources 116117 + OSM work from anywhere)
 therapist-finder crawl-berlin \
   --address "Kastanienallee 12, 10435 Berlin" \
   --max 20 \
+  --output clients/anna/
+
+# Full coverage (run from your laptop, not CI):
+therapist-finder crawl-berlin \
+  --address "Kastanienallee 12, 10435 Berlin" \
+  --max 20 \
+  --sources 116117,osm,psych_info,therapie_de \
   --output clients/anna/
 
 # Generate AppleScript for existing client
