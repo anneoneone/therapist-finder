@@ -7,8 +7,8 @@ This script demonstrates how to:
 3. Handle the API authentication and dynamic headers
 """
 
-import sys
 from pathlib import Path
+import sys
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -23,7 +23,7 @@ except ImportError:
     sys.exit(1)
 
 
-def test_location_search():
+def test_location_search() -> None:
     """Test location search functionality."""
     print("\n" + "=" * 60)
     print("Testing Location Search")
@@ -35,17 +35,21 @@ def test_location_search():
         results = client.search_location("Berlin")
         print(f"Found {len(results)} results")
         for i, loc in enumerate(results[:3], 1):
-            print(f"{i}. {loc.get('name', 'N/A')} - Lat: {loc.get('lat')}, Lon: {loc.get('lon')}")
+            print(
+                f"{i}. {loc.get('name', 'N/A')} - Lat: {loc.get('lat')}, Lon: {loc.get('lon')}"
+            )
 
         # Test with postal code
         print("\nSearching for: 10115")
         results = client.search_location("10115")
         print(f"Found {len(results)} results")
         for i, loc in enumerate(results[:3], 1):
-            print(f"{i}. {loc.get('name', 'N/A')} - Lat: {loc.get('lat')}, Lon: {loc.get('lon')}")
+            print(
+                f"{i}. {loc.get('name', 'N/A')} - Lat: {loc.get('lat')}, Lon: {loc.get('lon')}"
+            )
 
 
-def test_therapist_search():
+def test_therapist_search() -> None:
     """Test therapist search functionality."""
     print("\n" + "=" * 60)
     print("Testing Therapist Search")
@@ -58,7 +62,7 @@ def test_therapist_search():
         max_results=5,
     )
 
-    print(f"\nSearch parameters:")
+    print("\nSearch parameters:")
     print(f"  Specialty: {params.specialty}")
     print(f"  Location: {params.location}")
     print(f"  Radius: {params.radius} km")
@@ -86,10 +90,11 @@ def test_therapist_search():
         except Exception as e:
             print(f"\nError during search: {e}")
             import traceback
+
             traceback.print_exc()
 
 
-def test_authentication():
+def test_authentication() -> None:
     """Test API authentication."""
     print("\n" + "=" * 60)
     print("Testing API Authentication")
@@ -100,11 +105,11 @@ def test_authentication():
     print(f"Password (decoded): {client.password[:8]}...")
     print(f"Base URL: {client.BASE_URL}")
     print(f"API Path: {client.API_PATH}")
-    
+
     # Test req-val generation
     req_val = client._generate_req_val()
     print(f"Generated req-val token: {req_val}")
-    
+
     client.close()
 
 
@@ -129,5 +134,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n\nFatal error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

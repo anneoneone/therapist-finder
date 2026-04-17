@@ -156,7 +156,9 @@ def show_statistics(
 
 @app.command()
 def search_116117(
-    specialty: str = typer.Option("Psychotherapeut", "--specialty", "-s", help="Therapist specialty"),
+    specialty: str = typer.Option(
+        "Psychotherapeut", "--specialty", "-s", help="Therapist specialty"
+    ),
     location: str = typer.Option(..., "--location", "-l", help="City or postal code"),
     radius: int = typer.Option(25, "--radius", "-r", help="Search radius in km"),
     max_results: int = typer.Option(50, "--max", "-m", help="Maximum results"),
@@ -165,11 +167,15 @@ def search_116117(
     """Search for therapists using arztsuche.116117.de API."""
     try:
         from .parsers.arztsuche_api import Arztsuche116117Client, SearchParams
-    except ImportError:
-        rprint("[red]Error: httpx is required for API access. Install with: poetry add httpx[/red]")
-        raise typer.Exit(1)
+    except ImportError as err:
+        rprint(
+            "[red]Error: httpx is required for API access. Install with: poetry add httpx[/red]"
+        )
+        raise typer.Exit(1) from err
 
-    console.print(f"\n[bold blue]Searching for {specialty} in {location}...[/bold blue]")
+    console.print(
+        f"\n[bold blue]Searching for {specialty} in {location}...[/bold blue]"
+    )
 
     # Create search parameters
     params = SearchParams(
@@ -185,7 +191,7 @@ def search_116117(
             therapists = client.search_therapists(params)
     except Exception as e:
         rprint(f"[red]Error: API request failed: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
     if not therapists:
         rprint("[yellow]No therapists found[/yellow]")
@@ -209,32 +215,26 @@ def search_116117(
     # Save results if output directory specified
     if output_dir:
         output_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Convert to TherapistData format
-        from .models import Therapist
-        
-        therapist_list = []
-        for t in therapists:
-            therapist_list.append(
-                Therapist(
-                    name=t.name,
-                    street=t.street or "",
-                    city=t.city or "",
-                    postal_code=t.postal_code or "",
-                    phone=t.phone or "",
-                    email=t.email or "",
-                )
+
+        therapist_list = [
+            TherapistData(
+                name=t.name,
+                address=f"{t.street or ''}, {t.postal_code or ''} {t.city or ''}".strip(
+                    ", "
+                ),
+                telefon=t.phone or None,
+                email=t.email or None,
             )
-        
-        data = TherapistData(therapists=therapist_list)
-        
+            for t in therapists
+        ]
+
         json_path = output_dir / "therapists_116117.json"
         md_path = output_dir / "therapists_116117.md"
-        
-        save_json(data, json_path)
-        save_markdown(data, md_path)
-        
-        console.print(f"\n[green]✓ Results saved to:[/green]")
+
+        save_json([td.model_dump() for td in therapist_list], json_path)
+        save_markdown(therapist_list, md_path)
+
+        console.print("\n[green]✓ Results saved to:[/green]")
         console.print(f"  JSON: {json_path}")
         console.print(f"  Markdown: {md_path}")
 

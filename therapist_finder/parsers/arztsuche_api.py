@@ -1,13 +1,14 @@
-"""API client for arztsuche.116117.de
+"""API client for arztsuche.116117.de.
 
 This module provides a client for searching therapists using the
 official German medical directory API (Arztsuche 116117).
 """
 
+from datetime import datetime
 import hashlib
 import time
-from datetime import datetime
-from typing import Any
+from types import TracebackType
+from typing import Any, cast
 
 import httpx
 from pydantic import BaseModel, Field
@@ -16,7 +17,9 @@ from pydantic import BaseModel, Field
 class SearchParams(BaseModel):
     """Parameters for therapist search."""
 
-    specialty: str = Field(..., description="Therapist specialty (e.g., 'Psychotherapeut')")
+    specialty: str = Field(
+        ..., description="Therapist specialty (e.g., 'Psychotherapeut')"
+    )
     location: str = Field(..., description="City or postal code")
     max_results: int = Field(50, description="Maximum number of results", ge=1, le=50)
     radius: int = Field(25, description="Search radius in km", ge=1, le=100)
@@ -37,7 +40,7 @@ class Therapist116117(BaseModel):
 
 class Arztsuche116117Client:
     """Client for interacting with arztsuche.116117.de API.
-    
+
     The API requires HTTP Basic Authentication with credentials that are
     embedded in the website's JavaScript. It also requires a dynamic
     request validation header that includes timestamp-based tokens.
@@ -48,9 +51,9 @@ class Arztsuche116117Client:
 
     # API credentials (decoded from JS)
     USERNAME = "bdps"
-    PASSWORD = "fkr493mvg_f"
+    PASSWORD = "fkr493mvg_f"  # nosec B105 - public API credential from 116117 JS
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the API client."""
         self.username = self.USERNAME
         self.password = self.PASSWORD
@@ -67,38 +70,38 @@ class Arztsuche116117Client:
 
     def _generate_req_val(self) -> str:
         """Generate the req-val header for API requests.
-        
+
         The req-val header is a dynamic token that includes timestamp
         components to prevent replay attacks.
-        
+
         Returns:
             The req-val token string.
         """
         now = datetime.now()
         timestamp_ms = int(time.time() * 1000)
-        
+
         # Components used in the hash calculation
         year = str(now.year)
         month = str(now.month).zfill(2)
         day = str(now.day).zfill(2)
         hour = str(now.hour).zfill(2)
-        
+
         # The website uses a specific formula to generate this token
         # This is a simplified version - the actual implementation may vary
         components = f"{year}{month}{day}{hour}{timestamp_ms}"
         token = hashlib.sha256(components.encode()).hexdigest()[:32]
-        
+
         return token
 
     def search_location(self, query: str) -> list[dict[str, Any]]:
         """Search for location suggestions.
-        
+
         Args:
             query: City name or postal code to search for.
-            
+
         Returns:
             List of location suggestions with coordinates.
-            
+
         Raises:
             httpx.HTTPError: If the API request fails.
         """
@@ -108,17 +111,17 @@ class Arztsuche116117Client:
             headers={"req-val": self._generate_req_val()},
         )
         response.raise_for_status()
-        return response.json()
+        return cast(list[dict[str, Any]], response.json())
 
     def search_therapists(self, params: SearchParams) -> list[Therapist116117]:
         """Search for therapists using the 116117 API.
-        
+
         Args:
             params: Search parameters including specialty and location.
-            
+
         Returns:
             List of therapists matching the search criteria.
-            
+
         Raises:
             httpx.HTTPError: If the API request fails.
         """
@@ -126,9 +129,9 @@ class Arztsuche116117Client:
         locations = self.search_location(params.location)
         if not locations:
             return []
-        
+
         location_data = locations[0]  # Use first result
-        
+
         # Prepare search request
         search_data = {
             "specialty": params.specialty,
@@ -137,18 +140,18 @@ class Arztsuche116117Client:
             "radius": params.radius,
             "limit": params.max_results,
         }
-        
+
         response = self.client.post(
             f"{self.API_PATH}/data",
             json=search_data,
             headers={"req-val": self._generate_req_val()},
         )
         response.raise_for_status()
-        
+
         # Parse results
         results = response.json()
         therapists = []
-        
+
         for item in results.get("results", []):
             therapist = Therapist116117(
                 name=item.get("name", ""),
@@ -161,17 +164,22 @@ class Arztsuche116117Client:
                 distance=item.get("distance"),
             )
             therapists.append(therapist)
-        
+
         return therapists
 
-    def close(self):
+    def close(self) -> None:
         """Close the HTTP client."""
         self.client.close()
 
-    def __enter__(self):
+    def __enter__(self) -> "Arztsuche116117Client":
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """Context manager exit."""
         self.close()
