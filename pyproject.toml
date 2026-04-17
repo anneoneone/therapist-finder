@@ -28,6 +28,10 @@ python-multipart = "^0.0.12"
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.0"
 pytest-cov = "^6.0.0"
+pytest-httpx = "^0.30.0"
+# Only needed by scripts/recon_sources.py; install chromium with
+# `poetry run playwright install chromium` before running.
+playwright = "^1.48.0"
 black = "^24.10.0"
 ruff = "^0.8.0"
 mypy = "^1.13.0"

@@ -49,12 +49,21 @@ therapist-finder process --pdf path/to/therapists.pdf
 # Parse a text file
 therapist-finder process --text path/to/therapists.txt
 
+# Crawl Berlin directories for the N closest providers to an address
+therapist-finder crawl-berlin \
+  --address "Kastanienallee 12, 10435 Berlin" \
+  --max 20 \
+  --output clients/anna/
+
 # Generate AppleScript for existing client
 therapist-finder applescript --client "John Doe"
 
 # Show help
 therapist-finder --help
 ```
+
+See [docs/sources.md](docs/sources.md) for the crawl pipeline, supported
+directories (116117, OSM, PTK Berlin, Ärztekammer Berlin), and configuration.
 
 ### Python API
 

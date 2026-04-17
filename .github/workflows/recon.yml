@@ -1,0 +1,68 @@
+name: Recon Berlin directories
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Comma-separated target names (leave blank for all)"
+        required: false
+        default: ""
+      extra:
+        description: "Extra target as name=URL (optional)"
+        required: false
+        default: ""
+
+jobs:
+  recon:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install dependencies
+        run: poetry install --with dev --no-interaction
+
+      - name: Install Chromium for Playwright
+        run: poetry run playwright install --with-deps chromium
+
+      - name: Run recon
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.only }}" ]; then
+            ARGS="$ARGS --only ${{ github.event.inputs.only }}"
+          fi
+          if [ -n "${{ github.event.inputs.extra }}" ]; then
+            ARGS="$ARGS --extra ${{ github.event.inputs.extra }}"
+          fi
+          poetry run python scripts/recon_sources.py $ARGS
+
+      - name: Publish summary to job step
+        if: always()
+        run: |
+          if [ -f recon/summary.md ]; then
+            cat recon/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No recon/summary.md produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload recon artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recon-${{ github.run_id }}
+          path: recon/
+          if-no-files-found: warn
+          retention-days: 14

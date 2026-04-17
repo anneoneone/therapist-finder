@@ -1,0 +1,48 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API",
+  "elements": [
+    {
+      "type": "node",
+      "id": 1,
+      "lat": 52.5396,
+      "lon": 13.4127,
+      "tags": {
+        "name": "Praxis Dr. Anna Beispiel",
+        "healthcare": "psychotherapist",
+        "healthcare:speciality": "psychotherapy",
+        "addr:street": "Kastanienallee",
+        "addr:housenumber": "12",
+        "addr:postcode": "10435",
+        "addr:city": "Berlin",
+        "phone": "+49 30 1234567",
+        "email": "praxis@beispiel.de",
+        "website": "https://praxis-beispiel.de",
+        "language": "de;en"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2,
+      "lat": 52.52,
+      "lon": 13.405,
+      "tags": {
+        "name": "Dr. Bernd Muster",
+        "amenity": "doctors",
+        "addr:street": "Hauptstraße",
+        "addr:housenumber": "7",
+        "addr:postcode": "10115",
+        "addr:city": "Berlin"
+      }
+    },
+    {
+      "type": "way",
+      "id": 3,
+      "center": { "lat": 52.53, "lon": 13.40 },
+      "tags": {
+        "amenity": "doctors",
+        "name": ""
+      }
+    }
+  ]
+}

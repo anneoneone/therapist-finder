@@ -1,6 +1,7 @@
 """Command-line interface for therapist finder."""
 
 from pathlib import Path
+from typing import Protocol, runtime_checkable
 
 from rich import print as rprint
 from rich.console import Console
@@ -12,6 +13,26 @@ from .email import EmailGenerator
 from .models import EmailDraft, TherapistData, UserInfo
 from .parsers import PDFParser, TextParser
 from .utils.file_utils import save_json, save_markdown
+
+
+@runtime_checkable
+class _SourceLike(Protocol):
+    """Duck-typed protocol covering both TherapistSource and Arztsuche116117Source."""
+
+    name: str
+
+    def search(
+        self, params: "SearchParams"
+    ) -> list[TherapistData]:  # pragma: no cover - protocol
+        """Return providers matching the given search parameters."""
+        ...
+
+    def close(self) -> None:  # pragma: no cover - protocol
+        """Release held resources."""
+        ...
+
+
+from .sources.base import SearchParams  # noqa: E402 - referenced in Protocol above
 
 app = typer.Typer(help="Parse therapist data and generate email drafts")
 console = Console()
@@ -237,6 +258,169 @@ def search_116117(
         console.print("\n[green]✓ Results saved to:[/green]")
         console.print(f"  JSON: {json_path}")
         console.print(f"  Markdown: {md_path}")
+
+
+@app.command("crawl-berlin")
+def crawl_berlin(
+    address: str = typer.Option(
+        ...,
+        "--address",
+        "-a",
+        help="Street address to search around (e.g. 'Kastanienallee 12, 10435 Berlin')",
+    ),
+    max_results: int = typer.Option(
+        20, "--max", "-n", help="Return the N closest providers"
+    ),
+    specialty: str = typer.Option(
+        "Psychotherapeut", "--specialty", "-s", help="Specialty filter"
+    ),
+    radius_km: float = typer.Option(
+        15.0, "--radius", "-r", help="Per-source search radius in km"
+    ),
+    sources: str = typer.Option(
+        "116117,osm,ptk,aeka",
+        "--sources",
+        help="Comma-separated source names to query",
+    ),
+    output_dir: Path | None = typer.Option(
+        None, "--output", help="Directory to write merged JSON + Markdown to"
+    ),
+) -> None:
+    """Crawl multiple Berlin directories for the N closest providers to an address."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    from .sources import SearchParams, merge_and_rank
+    from .sources.geocode import Geocoder, GeocodingError
+
+    settings = Settings()
+    requested = [s.strip() for s in sources.split(",") if s.strip()]
+
+    console.print(f"\n[bold blue]Geocoding {address!r}...[/bold blue]")
+    geocoder = Geocoder(
+        endpoint=settings.nominatim_endpoint,
+        user_agent=settings.scraper_user_agent,
+        cache_dir=settings.http_cache_dir,
+    )
+    try:
+        origin = geocoder.geocode(address)
+    except GeocodingError as e:
+        rprint(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1) from e
+
+    console.print(
+        f"[green]→ {origin.display_name}[/green] "
+        f"(lat={origin.lat:.5f}, lon={origin.lon:.5f})"
+    )
+
+    params = SearchParams(
+        specialty=specialty,
+        lat=origin.lat,
+        lon=origin.lon,
+        radius_km=radius_km,
+        limit_per_source=max(max_results * 3, 50),
+    )
+
+    source_instances = _build_sources(requested, settings)
+    if not source_instances:
+        rprint("[red]Error: no valid sources selected[/red]")
+        raise typer.Exit(1)
+
+    results: dict[str, list[TherapistData]] = {}
+    with ThreadPoolExecutor(max_workers=len(source_instances)) as pool:
+        futures = {
+            pool.submit(src.search, params): src.name for src in source_instances
+        }
+        for fut in as_completed(futures):
+            name = futures[fut]
+            try:
+                results[name] = fut.result()
+                console.print(
+                    f"[green]✓ {name}: {len(results[name])} providers[/green]"
+                )
+            except Exception as e:  # noqa: BLE001
+                rprint(f"[yellow]⚠ {name} failed: {e}[/yellow]")
+                results[name] = []
+
+    for src in source_instances:
+        src.close()
+
+    merged = merge_and_rank(
+        results, origin.lat, origin.lon, max_results, geocoder=geocoder
+    )
+    geocoder.close()
+
+    _render_ranked_table(merged, origin.display_name)
+
+    if output_dir:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        json_path = output_dir / "therapists_nearest.json"
+        md_path = output_dir / "therapists_nearest.md"
+        save_json([t.model_dump() for t in merged], json_path, settings.json_indent)
+        save_markdown(merged, md_path)
+        console.print("\n[green]✓ Results saved to:[/green]")
+        console.print(f"  JSON: {json_path}")
+        console.print(f"  Markdown: {md_path}")
+
+
+def _build_sources(requested: list[str], settings: Settings) -> list[_SourceLike]:
+    """Instantiate the sources requested on the CLI (ignores unknown names)."""
+    from .parsers.arztsuche_api import Arztsuche116117Source
+    from .sources.arztauskunft_berlin import ArztauskunftBerlinSource
+    from .sources.overpass import OverpassSource
+    from .sources.ptk_berlin import PTKBerlinSource
+
+    instances: list[_SourceLike] = []
+    for name in requested:
+        if name == "116117":
+            instances.append(Arztsuche116117Source())
+        elif name == "osm":
+            instances.append(
+                OverpassSource(
+                    endpoint=settings.overpass_endpoint,
+                    user_agent=settings.scraper_user_agent,
+                )
+            )
+        elif name == "ptk":
+            instances.append(
+                PTKBerlinSource(
+                    user_agent=settings.scraper_user_agent,
+                    min_delay_seconds=settings.scraper_min_delay_seconds,
+                )
+            )
+        elif name == "aeka":
+            instances.append(
+                ArztauskunftBerlinSource(
+                    user_agent=settings.scraper_user_agent,
+                    min_delay_seconds=settings.scraper_min_delay_seconds,
+                )
+            )
+        else:
+            rprint(f"[yellow]⚠ Unknown source: {name}[/yellow]")
+    return instances
+
+
+def _render_ranked_table(merged: list[TherapistData], origin_label: str) -> None:
+    """Print a Rich table of ranked results."""
+    table = Table(title=f"Nearest {len(merged)} providers to {origin_label}")
+    table.add_column("#", style="dim", justify="right")
+    table.add_column("Name", style="cyan")
+    table.add_column("Address", style="green")
+    table.add_column("Phone", style="yellow")
+    table.add_column("Distance", style="magenta", justify="right")
+    table.add_column("Sources", style="blue")
+
+    for i, t in enumerate(merged, 1):
+        distance = f"{t.distance_km:.2f} km" if t.distance_km is not None else "-"
+        table.add_row(
+            str(i),
+            t.name,
+            t.address or "-",
+            t.telefon or "-",
+            distance,
+            ",".join(t.sources),
+        )
+    console.print("\n")
+    console.print(table)
 
 
 if __name__ == "__main__":
