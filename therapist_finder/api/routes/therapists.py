@@ -74,7 +74,7 @@ async def search_by_address(
     requested = request.sources or settings.enabled_sources
 
     geocoder = Geocoder(
-        endpoint=settings.nominatim_endpoint,
+        endpoint=settings.geocoder_endpoint,
         user_agent=settings.scraper_user_agent,
         cache_dir=settings.http_cache_dir,
     )

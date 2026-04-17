@@ -73,9 +73,14 @@ class Settings(BaseSettings):
         default="https://overpass-api.de/api/interpreter",
         description="Overpass API endpoint",
     )
-    nominatim_endpoint: str = Field(
-        default="https://nominatim.openstreetmap.org/search",
-        description="Nominatim geocoding endpoint",
+    geocoder_endpoint: str = Field(
+        default="https://photon.komoot.io/api/",
+        description=(
+            "Geocoding endpoint. Provider is detected by URL: 'photon' in the "
+            "host switches to Photon's GeoJSON shape; anything else is treated "
+            "as Nominatim. Defaults to Photon because the public Nominatim "
+            "instance rate-limits shared cloud IPs aggressively."
+        ),
     )
     http_cache_dir: Path | None = Field(
         default=Path(".cache/therapist-finder"),

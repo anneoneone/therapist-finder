@@ -190,10 +190,10 @@ class TestTherapieDeSource:
 
 
 class TestGeocoder:
-    """Tests for the Nominatim geocoder wrapper."""
+    """Tests for the Photon + Nominatim geocoder wrapper."""
 
-    def test_geocode_success(self, httpx_mock: HTTPXMock, tmp_path: Path) -> None:
-        """A Berlin address returns a ``Location`` and caches the response."""
+    def test_nominatim_success(self, httpx_mock: HTTPXMock, tmp_path: Path) -> None:
+        """Nominatim endpoint parses the flat-list response shape."""
         httpx_mock.add_response(
             url=httpx.URL(
                 "https://nominatim.example/search",
@@ -225,6 +225,49 @@ class TestGeocoder:
             geocoder.close()
         assert loc.lat == pytest.approx(52.5396)
         assert loc.lon == pytest.approx(13.4127)
+
+    def test_photon_success(self, httpx_mock: HTTPXMock, tmp_path: Path) -> None:
+        """Photon endpoint parses the GeoJSON FeatureCollection response."""
+        httpx_mock.add_response(
+            url=httpx.URL(
+                "https://photon.example/api/",
+                params={
+                    "q": "Kastanienallee 12, 10435 Berlin",
+                    "limit": "1",
+                    "lang": "de",
+                },
+            ),
+            method="GET",
+            json={
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "geometry": {
+                            "type": "Point",
+                            "coordinates": [13.4127, 52.5396],
+                        },
+                        "properties": {
+                            "street": "Kastanienallee",
+                            "housenumber": "12",
+                            "postcode": "10435",
+                            "city": "Berlin",
+                        },
+                    }
+                ],
+            },
+        )
+        geocoder = Geocoder(
+            endpoint="https://photon.example/api/",
+            user_agent=UA,
+            cache_dir=tmp_path,
+        )
+        try:
+            loc = geocoder.geocode("Kastanienallee 12, 10435 Berlin")
+        finally:
+            geocoder.close()
+        assert loc.lat == pytest.approx(52.5396)
+        assert loc.lon == pytest.approx(13.4127)
+        assert "Kastanienallee" in loc.display_name
 
     def test_geocode_outside_berlin_raises(
         self, httpx_mock: HTTPXMock, tmp_path: Path
