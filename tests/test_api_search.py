@@ -30,12 +30,8 @@ def test_search_by_address_success() -> None:
     )
 
     with (
-        patch(
-            "therapist_finder.api.routes.therapists.Geocoder"
-        ) as mock_geocoder_cls,
-        patch(
-            "therapist_finder.api.routes.therapists._build_source"
-        ) as mock_build,
+        patch("therapist_finder.api.routes.therapists.Geocoder") as mock_geocoder_cls,
+        patch("therapist_finder.api.routes.therapists._build_source") as mock_build,
     ):
         geocoder = mock_geocoder_cls.return_value
         geocoder.geocode.return_value = _fake_location()
@@ -75,9 +71,7 @@ def test_search_by_address_success() -> None:
 
 def test_search_by_address_invalid_address() -> None:
     """Non-Berlin address → 400 with the geocoder's message."""
-    with patch(
-        "therapist_finder.api.routes.therapists.Geocoder"
-    ) as mock_geocoder_cls:
+    with patch("therapist_finder.api.routes.therapists.Geocoder") as mock_geocoder_cls:
         mock_geocoder_cls.return_value.geocode.side_effect = GeocodingError(
             "outside Berlin"
         )
@@ -93,9 +87,7 @@ def test_search_by_address_invalid_address() -> None:
 
 def test_search_by_address_rejects_unknown_sources() -> None:
     """All sources unknown → 400 'No valid sources selected'."""
-    with patch(
-        "therapist_finder.api.routes.therapists.Geocoder"
-    ) as mock_geocoder_cls:
+    with patch("therapist_finder.api.routes.therapists.Geocoder") as mock_geocoder_cls:
         mock_geocoder_cls.return_value.geocode.return_value = _fake_location()
 
         client = TestClient(app)

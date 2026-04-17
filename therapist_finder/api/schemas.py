@@ -46,8 +46,7 @@ class SearchByAddressRequest(BaseModel):
     address: str = Field(
         ...,
         description=(
-            "Street address to search around, "
-            "e.g. 'Kastanienallee 12, 10435 Berlin'"
+            "Street address to search around, e.g. 'Kastanienallee 12, 10435 Berlin'"
         ),
     )
     max_results: int = Field(

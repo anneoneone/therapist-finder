@@ -85,9 +85,7 @@ async def search_by_address(
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:  # noqa: BLE001
         geocoder.close()
-        raise HTTPException(
-            status_code=502, detail=f"Geocoding failed: {e}"
-        ) from e
+        raise HTTPException(status_code=502, detail=f"Geocoding failed: {e}") from e
 
     params = SearchParams(
         specialty=request.specialty,
