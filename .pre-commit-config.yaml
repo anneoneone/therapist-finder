@@ -40,6 +40,8 @@ repos:
           - typer>=0.19.0
           - rich>=13.9.0
           - pydantic-settings>=2.6.0
+          - fastapi>=0.115.0
+          - httpx>=0.27.0
           - types-requests
         exclude: ^tests/
         args: [--strict]
@@ -57,6 +59,8 @@ repos:
     rev: 6.3.0
     hooks:
       - id: pydocstyle
+        additional_dependencies:
+          - tomli
         exclude: ^tests/
         args: [--convention=google]
 

@@ -3,8 +3,8 @@
 from fastapi import APIRouter, HTTPException
 
 from ...config import Settings
-from ...models import EmailDraft, TherapistData, UserInfo
 from ...email.generator import EmailGenerator
+from ...models import TherapistData, UserInfo
 from ...utils.applescript_generator import create_applescript_content
 from ..schemas import (
     EmailDraftResponse,
@@ -46,10 +46,10 @@ def _generate_csv(therapists: list[TherapistResponse]) -> str:
 
     for t in therapists:
         row = [
-            f'"{(t.name or "").replace(chr(34), chr(34)+chr(34))}"',
-            f'"{(t.email or "").replace(chr(34), chr(34)+chr(34))}"',
-            f'"{(t.phone or "").replace(chr(34), chr(34)+chr(34))}"',
-            f'"{(t.address or "").replace(chr(34), chr(34)+chr(34))}"',
+            f'"{(t.name or "").replace(chr(34), chr(34) + chr(34))}"',
+            f'"{(t.email or "").replace(chr(34), chr(34) + chr(34))}"',
+            f'"{(t.phone or "").replace(chr(34), chr(34) + chr(34))}"',
+            f'"{(t.address or "").replace(chr(34), chr(34) + chr(34))}"',
         ]
         rows.append(",".join(row))
 
