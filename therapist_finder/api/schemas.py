@@ -28,6 +28,8 @@ class TherapistResponse(BaseModel):
     phone: str | None = None
     email: str | None = None
     salutation: str | None = None
+    distance_km: float | None = None
+    sources: list[str] = []
 
 
 class ParseResponse(BaseModel):
@@ -36,6 +38,43 @@ class ParseResponse(BaseModel):
     therapists: list[TherapistResponse]
     total: int
     with_email: int
+
+
+class SearchByAddressRequest(BaseModel):
+    """Search by address: the webapp's default entry point."""
+
+    address: str = Field(
+        ...,
+        description=(
+            "Street address to search around, "
+            "e.g. 'Kastanienallee 12, 10435 Berlin'"
+        ),
+    )
+    max_results: int = Field(
+        20, ge=1, le=100, description="Return the N closest providers"
+    )
+    specialty: str = Field("Psychotherapeut", description="Specialty filter")
+    radius_km: float = Field(
+        15.0, ge=0.5, le=50.0, description="Per-source search radius"
+    )
+    sources: list[str] | None = Field(
+        None,
+        description=(
+            "Source names to query. Defaults to the CI-safe set configured "
+            "in Settings.enabled_sources when omitted."
+        ),
+    )
+
+
+class SearchByAddressResponse(BaseModel):
+    """Response to a search-by-address request."""
+
+    therapists: list[TherapistResponse]
+    total: int
+    with_email: int
+    origin_address: str
+    origin_lat: float
+    origin_lon: float
 
 
 class EmailDraftResponse(BaseModel):

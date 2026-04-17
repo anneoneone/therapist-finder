@@ -3,7 +3,13 @@
  * @module app
  */
 
-import { parseFile, generateEmails, downloadFile, APIError } from './api.js';
+import {
+    APIError,
+    downloadFile,
+    generateEmails,
+    parseFile,
+    searchByAddress,
+} from './api.js';
 
 // ============================================
 // State
@@ -26,7 +32,19 @@ const TRUNCATION_MARKER = '\n\n[… truncated — use "Copy body" to paste full 
 // ============================================
 
 const elements = {
-    // Upload section
+    // Address search section (default)
+    searchSection: document.getElementById('search-section'),
+    searchForm: document.getElementById('search-form'),
+    searchBtn: document.getElementById('search-btn'),
+    searchStatus: document.getElementById('search-status'),
+    searchAddress: document.getElementById('search-address'),
+    searchMax: document.getElementById('search-max'),
+    searchRadius: document.getElementById('search-radius'),
+    toggleUpload: document.getElementById('toggle-upload'),
+    toggleSearch: document.getElementById('toggle-search'),
+
+    // Upload section (legacy fallback)
+    uploadSection: document.getElementById('upload-section'),
     dropzone: document.getElementById('dropzone'),
     fileInput: document.getElementById('file-input'),
     selectedFile: document.getElementById('selected-file'),
@@ -127,6 +145,75 @@ function escapeHtml(text) {
 function formatDate(dateStr) {
     if (!dateStr) return '-';
     return dateStr;
+}
+
+// ============================================
+// Address search (default flow)
+// ============================================
+
+/**
+ * Handle the "Find therapists" form submission.
+ * Calls the backend crawl pipeline with an address and populates the same
+ * state that the PDF-upload path fills, so the downstream email-draft
+ * queue just works.
+ * @param {Event} event - Form submit event
+ */
+async function handleAddressSearch(event) {
+    event.preventDefault();
+    const address = elements.searchAddress.value.trim();
+    if (!address) return;
+
+    const maxResults = Number(elements.searchMax.value) || 20;
+    const radiusKm = Number(elements.searchRadius.value) || 15;
+
+    setButtonLoading(elements.searchBtn, true);
+    showStatus(
+        elements.searchStatus,
+        `Crawling public directories near ${address}…`,
+        'info'
+    );
+
+    try {
+        const result = await searchByAddress({
+            address,
+            max_results: maxResults,
+            radius_km: radiusKm,
+        });
+        state.therapists = result.therapists || [];
+
+        const count = state.therapists.length;
+        const withEmail = state.therapists.filter((t) => t.email).length;
+        showStatus(
+            elements.searchStatus,
+            `✓ ${count} therapists near ${result.origin_address || address} `
+                + `(${withEmail} with email)`,
+            'success'
+        );
+
+        elements.userinfoSection.hidden = false;
+        elements.userinfoSection.scrollIntoView({ behavior: 'smooth' });
+    } catch (error) {
+        console.error('Search error:', error);
+        showStatus(
+            elements.searchStatus,
+            error instanceof APIError
+                ? error.message
+                : 'Search failed. Please try again.',
+            'error'
+        );
+    } finally {
+        setButtonLoading(elements.searchBtn, false);
+    }
+}
+
+/**
+ * Swap between the address-search and file-upload sections.
+ * @param {'search' | 'upload'} target
+ */
+function setEntrySection(target) {
+    const showSearch = target === 'search';
+    elements.searchSection.hidden = !showSearch;
+    elements.uploadSection.hidden = showSearch;
 }
 
 // ============================================
@@ -582,6 +669,17 @@ async function handleQueueCopyBody() {
 // ============================================
 
 function initEventListeners() {
+    // Address search (default flow)
+    elements.searchForm.addEventListener('submit', handleAddressSearch);
+    elements.toggleUpload.addEventListener('click', (e) => {
+        e.preventDefault();
+        setEntrySection('upload');
+    });
+    elements.toggleSearch.addEventListener('click', (e) => {
+        e.preventDefault();
+        setEntrySection('search');
+    });
+
     // Dropzone click
     elements.dropzone.addEventListener('click', (e) => {
         if (e.target !== elements.removeFile && !elements.removeFile.contains(e.target)) {
