@@ -183,3 +183,92 @@ class Arztsuche116117Client:
     ) -> None:
         """Context manager exit."""
         self.close()
+
+
+class Arztsuche116117Source:
+    """Adapter that exposes :class:`Arztsuche116117Client` as a TherapistSource.
+
+    Implemented as a duck-typed ``TherapistSource`` to avoid a circular
+    import (``sources`` imports models; this module already imports pydantic
+    + httpx and belongs to ``parsers``). See
+    ``therapist_finder.sources.base.TherapistSource`` for the protocol.
+    """
+
+    name = "116117"
+
+    def __init__(self, client: "Arztsuche116117Client | None" = None) -> None:
+        """Initialise the adapter, optionally with a pre-built client."""
+        self._client = client or Arztsuche116117Client()
+        self._owns_client = client is None
+
+    def search(self, params: object) -> list[Any]:
+        """Translate the unified :class:`SearchParams` into a 116117 query.
+
+        Imports :class:`therapist_finder.sources.base.SearchParams` and
+        :class:`therapist_finder.models.TherapistData` lazily to avoid a
+        circular import during module loading.
+        """
+        from therapist_finder.models import TherapistData
+        from therapist_finder.sources.base import SearchParams as SrcParams
+
+        if not isinstance(params, SrcParams):
+            raise TypeError(
+                "Arztsuche116117Source.search requires a sources.base.SearchParams"
+            )
+
+        # 116117 accepts radius 1-100 km and up to 50 results per request.
+        radius = max(1, min(100, int(round(params.radius_km))))
+        max_results = max(1, min(50, params.limit_per_source))
+        search_data = {
+            "specialty": params.specialty,
+            "lat": params.lat,
+            "lon": params.lon,
+            "radius": radius,
+            "limit": max_results,
+        }
+        response = self._client.client.post(
+            f"{self._client.API_PATH}/data",
+            json=search_data,
+            headers={"req-val": self._client._generate_req_val()},
+        )
+        response.raise_for_status()
+
+        therapists: list[TherapistData] = []
+        for item in response.json().get("results", []):
+            street = item.get("street")
+            city = item.get("city")
+            postal = item.get("postalCode")
+            address = ", ".join(
+                part
+                for part in (street, " ".join(x for x in (postal, city) if x))
+                if part
+            )
+            therapists.append(
+                TherapistData(
+                    name=item.get("name", "") or "",
+                    address=address or None,
+                    telefon=item.get("phone"),
+                    email=item.get("email"),
+                    therapieform=[item["specialty"]] if item.get("specialty") else [],
+                    sources=[self.name],
+                )
+            )
+        return therapists
+
+    def close(self) -> None:
+        """Close the wrapped client if we own it."""
+        if self._owns_client:
+            self._client.close()
+
+    def __enter__(self) -> "Arztsuche116117Source":
+        """Context manager entry."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Context manager exit."""
+        self.close()

@@ -41,6 +41,37 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")
 
+    # Source / scraper settings
+    enabled_sources: list[str] = Field(
+        default_factory=lambda: ["116117", "osm", "ptk", "aeka"],
+        description="Default data sources for crawl-berlin",
+    )
+    default_max_results: int = Field(
+        default=20, description="Default N closest providers to return"
+    )
+    scraper_user_agent: str = Field(
+        default=(
+            "therapist-finder/0.1 "
+            "(+https://github.com/anneoneone/therapist-finder)"
+        ),
+        description="User-Agent sent by scrapers and geocoder",
+    )
+    scraper_min_delay_seconds: float = Field(
+        default=2.0, description="Minimum delay between requests to a given host"
+    )
+    overpass_endpoint: str = Field(
+        default="https://overpass-api.de/api/interpreter",
+        description="Overpass API endpoint",
+    )
+    nominatim_endpoint: str = Field(
+        default="https://nominatim.openstreetmap.org/search",
+        description="Nominatim geocoding endpoint",
+    )
+    http_cache_dir: Path | None = Field(
+        default=Path(".cache/therapist-finder"),
+        description="Directory for caching HTTP responses",
+    )
+
     def get_client_directory(self, client_name: str) -> Path:
         """Get client-specific output directory."""
         safe_name = client_name.replace(" ", "_").replace("/", "_").lower()

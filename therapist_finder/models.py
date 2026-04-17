@@ -1,6 +1,10 @@
 """Data models for therapist finder application."""
 
+from typing import Literal
+
 from pydantic import BaseModel, field_validator
+
+InsuranceType = Literal["kassen", "privat", "both"]
 
 
 class UserInfo(BaseModel):
@@ -31,6 +35,13 @@ class TherapistData(BaseModel):
     therapieform: list[str] = []
     sprechzeiten: list[str] = []
     salutation: str | None = None
+    website: str | None = None
+    languages: list[str] = []
+    insurance_type: InsuranceType | None = None
+    lat: float | None = None
+    lon: float | None = None
+    distance_km: float | None = None
+    sources: list[str] = []
 
     @field_validator("name")
     @classmethod
