@@ -301,7 +301,7 @@ def crawl_berlin(
 
     console.print(f"\n[bold blue]Geocoding {address!r}...[/bold blue]")
     geocoder = Geocoder(
-        endpoint=settings.nominatim_endpoint,
+        endpoint=settings.geocoder_endpoint,
         user_agent=settings.scraper_user_agent,
         cache_dir=settings.http_cache_dir,
     )
