@@ -14,7 +14,12 @@ const state = {
     therapists: [],
     userInfo: {},
     results: null,
+    queue: { items: [], index: 0 },
 };
+
+const CONTACTED_STORAGE_KEY = 'therapist-finder:contacted-emails';
+const MAILTO_MAX_LENGTH = 1900;
+const TRUNCATION_MARKER = '\n\n[… truncated — use "Copy body" to paste full text]';
 
 // ============================================
 // DOM Elements
@@ -40,7 +45,22 @@ const elements = {
     resultsSummary: document.getElementById('results-summary'),
     therapistsTbody: document.getElementById('therapists-tbody'),
     downloadTable: document.getElementById('download-table'),
-    downloadApplescript: document.getElementById('download-applescript'),
+    openQueue: document.getElementById('open-queue'),
+
+    // Queue modal
+    queueOverlay: document.getElementById('queue-overlay'),
+    queueClose: document.getElementById('queue-close'),
+    queuePosition: document.getElementById('queue-position'),
+    queueTotal: document.getElementById('queue-total'),
+    queueTherapist: document.getElementById('queue-therapist'),
+    queueSubject: document.getElementById('queue-subject'),
+    queueBodyPreview: document.getElementById('queue-body-preview'),
+    queueTruncationWarning: document.getElementById('queue-truncation-warning'),
+    queueStatus: document.getElementById('queue-status'),
+    queueCopyBody: document.getElementById('queue-copy-body'),
+    queueSkip: document.getElementById('queue-skip'),
+    queueOpen: document.getElementById('queue-open'),
+    queueNext: document.getElementById('queue-next'),
 };
 
 // ============================================
@@ -259,7 +279,7 @@ async function handleGenerateEmails(event) {
  */
 function displayResults() {
     const { therapists } = state;
-    const { drafts = [], applescript = '' } = state.results || {};
+    const { drafts = [] } = state.results || {};
 
     // Summary
     const totalCount = therapists.length;
@@ -331,19 +351,230 @@ function handleDownloadTable() {
     downloadFile(csvContent, filename, 'text/csv');
 }
 
-/**
- * Download AppleScript file.
- */
-function handleDownloadApplescript() {
-    const { applescript = '' } = state.results || {};
+// ============================================
+// Email Draft Queue
+// ============================================
 
-    if (!applescript) {
-        showStatus(elements.generateStatus, 'No AppleScript available', 'warning');
+/**
+ * Load the set of previously-contacted email addresses from localStorage.
+ * @returns {Set<string>}
+ */
+function loadContactedEmails() {
+    try {
+        const raw = localStorage.getItem(CONTACTED_STORAGE_KEY);
+        if (!raw) return new Set();
+        const parsed = JSON.parse(raw);
+        return new Set(Array.isArray(parsed) ? parsed : []);
+    } catch (error) {
+        console.warn('Failed to load contacted emails:', error);
+        return new Set();
+    }
+}
+
+/**
+ * Persist the set of contacted email addresses.
+ * @param {Set<string>} set
+ */
+function saveContactedEmails(set) {
+    try {
+        localStorage.setItem(CONTACTED_STORAGE_KEY, JSON.stringify([...set]));
+    } catch (error) {
+        console.warn('Failed to save contacted emails:', error);
+    }
+}
+
+/**
+ * Mark a single email address as contacted.
+ * @param {string} email
+ */
+function markEmailContacted(email) {
+    if (!email) return;
+    const set = loadContactedEmails();
+    set.add(email.toLowerCase());
+    saveContactedEmails(set);
+}
+
+/**
+ * Build a mailto: URL, truncating the body if needed to stay within URL limits.
+ * @param {{to: string, subject: string, body: string}} draft
+ * @returns {{url: string, truncated: boolean}}
+ */
+function buildMailtoUrl({ to, subject, body }) {
+    const encodedTo = encodeURIComponent(to || '');
+    const encodedSubject = encodeURIComponent(subject || '');
+    const baseLength = `mailto:${encodedTo}?subject=${encodedSubject}&body=`.length;
+    const budget = MAILTO_MAX_LENGTH - baseLength;
+
+    let bodyToEncode = body || '';
+    let truncated = false;
+    let encodedBody = encodeURIComponent(bodyToEncode);
+
+    if (encodedBody.length > budget) {
+        truncated = true;
+        const markerLength = encodeURIComponent(TRUNCATION_MARKER).length;
+        // Binary-search for the largest prefix of body whose encoded length
+        // plus the encoded truncation marker fits into the budget.
+        let low = 0;
+        let high = bodyToEncode.length;
+        while (low < high) {
+            const mid = Math.ceil((low + high) / 2);
+            const candidate = encodeURIComponent(bodyToEncode.slice(0, mid)).length;
+            if (candidate + markerLength <= budget) {
+                low = mid;
+            } else {
+                high = mid - 1;
+            }
+        }
+        bodyToEncode = bodyToEncode.slice(0, low) + TRUNCATION_MARKER;
+        encodedBody = encodeURIComponent(bodyToEncode);
+    }
+
+    return {
+        url: `mailto:${encodedTo}?subject=${encodedSubject}&body=${encodedBody}`,
+        truncated,
+    };
+}
+
+/**
+ * Get the current draft in the queue, or null.
+ * @returns {object|null}
+ */
+function currentQueueDraft() {
+    const { items, index } = state.queue;
+    return items[index] || null;
+}
+
+/**
+ * Open the queue modal, populating it with uncontacted drafts.
+ */
+function openQueue() {
+    const drafts = (state.results && state.results.drafts) || [];
+    if (drafts.length === 0) {
+        showStatus(elements.generateStatus, 'No drafts available. Generate emails first.', 'warning');
         return;
     }
 
-    const filename = `mail_drafts_${new Date().toISOString().split('T')[0]}.applescript`;
-    downloadFile(applescript, filename, 'text/plain');
+    const contacted = loadContactedEmails();
+    const items = drafts.filter(d => d.to && !contacted.has(d.to.toLowerCase()));
+
+    if (items.length === 0) {
+        showStatus(
+            elements.generateStatus,
+            'All therapists from this list were already contacted. Clear your browser storage to start over.',
+            'info'
+        );
+        return;
+    }
+
+    state.queue = { items, index: 0 };
+    elements.queueOverlay.hidden = false;
+    hideStatus(elements.queueStatus);
+    renderQueueItem();
+}
+
+/**
+ * Render the current queue item into the modal.
+ */
+function renderQueueItem() {
+    const draft = currentQueueDraft();
+    if (!draft) {
+        closeQueue();
+        showStatus(elements.generateStatus, '✓ Queue complete.', 'success');
+        return;
+    }
+
+    const { items, index } = state.queue;
+    elements.queuePosition.textContent = String(index + 1);
+    elements.queueTotal.textContent = String(items.length);
+
+    elements.queueTherapist.innerHTML = `
+        <span class="queue-therapist-name">${escapeHtml(draft.therapist_name || draft.to)}</span>
+        <span class="queue-therapist-email">${escapeHtml(draft.to)}</span>
+    `;
+    elements.queueSubject.textContent = draft.subject || '';
+    elements.queueBodyPreview.textContent = draft.body || '';
+
+    const { truncated } = buildMailtoUrl(draft);
+    elements.queueTruncationWarning.hidden = !truncated;
+
+    elements.queueNext.disabled = true;
+    elements.queueOpen.disabled = false;
+    hideStatus(elements.queueStatus);
+}
+
+/**
+ * Trigger the mailto: URL and mark the current email as contacted.
+ */
+function handleQueueOpen() {
+    const draft = currentQueueDraft();
+    if (!draft) return;
+
+    const { url } = buildMailtoUrl(draft);
+
+    // Use an anchor click for best cross-browser reliability with mailto:.
+    const link = document.createElement('a');
+    link.href = url;
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    markEmailContacted(draft.to);
+    elements.queueNext.disabled = false;
+    elements.queueOpen.disabled = true;
+    showStatus(
+        elements.queueStatus,
+        'Mail app opened. Click Next when ready for the next therapist.',
+        'info'
+    );
+}
+
+/**
+ * Advance to the next queue item.
+ */
+function handleQueueNext() {
+    state.queue.index += 1;
+    renderQueueItem();
+}
+
+/**
+ * Skip the current therapist without marking them as contacted.
+ */
+function handleQueueSkip() {
+    state.queue.index += 1;
+    renderQueueItem();
+}
+
+/**
+ * Close the queue modal.
+ */
+function closeQueue() {
+    elements.queueOverlay.hidden = true;
+    state.queue = { items: [], index: 0 };
+}
+
+function handleQueueClose() {
+    closeQueue();
+}
+
+/**
+ * Copy the current draft's body to the clipboard.
+ */
+async function handleQueueCopyBody() {
+    const draft = currentQueueDraft();
+    if (!draft) return;
+
+    try {
+        await navigator.clipboard.writeText(draft.body || '');
+        showStatus(elements.queueStatus, '✓ Email body copied to clipboard.', 'success');
+    } catch (error) {
+        console.warn('Clipboard write failed:', error);
+        showStatus(
+            elements.queueStatus,
+            'Could not access clipboard. Select the text in the preview and copy manually.',
+            'warning'
+        );
+    }
 }
 
 // ============================================
@@ -392,9 +623,19 @@ function initEventListeners() {
     // User info form
     elements.userinfoForm.addEventListener('submit', handleGenerateEmails);
 
-    // Download buttons
+    // Download / queue buttons
     elements.downloadTable.addEventListener('click', handleDownloadTable);
-    elements.downloadApplescript.addEventListener('click', handleDownloadApplescript);
+    elements.openQueue.addEventListener('click', openQueue);
+
+    // Queue modal
+    elements.queueClose.addEventListener('click', handleQueueClose);
+    elements.queueOpen.addEventListener('click', handleQueueOpen);
+    elements.queueNext.addEventListener('click', handleQueueNext);
+    elements.queueSkip.addEventListener('click', handleQueueSkip);
+    elements.queueCopyBody.addEventListener('click', handleQueueCopyBody);
+    elements.queueOverlay.addEventListener('click', (e) => {
+        if (e.target === elements.queueOverlay) handleQueueClose();
+    });
 }
 
 // ============================================

@@ -495,6 +495,141 @@ body {
 }
 
 /* ========================================
+   Email Draft Queue
+   ======================================== */
+
+.queue-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(17, 24, 39, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-lg);
+    z-index: 100;
+    animation: fadeIn var(--transition-base) ease-out;
+}
+
+.queue-modal {
+    background: var(--color-bg-white);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-width: 640px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.queue-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-lg) var(--space-xl);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.queue-header h3 {
+    flex: 1;
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+}
+
+.queue-body {
+    padding: var(--space-lg) var(--space-xl);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.queue-therapist {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.queue-therapist-name {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.queue-therapist-email {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    word-break: break-all;
+}
+
+.queue-preview {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+    padding: var(--space-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.queue-preview-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    font-size: var(--font-size-sm);
+}
+
+.queue-preview-label {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.queue-preview-body pre {
+    font-family: var(--font-family);
+    font-size: var(--font-size-sm);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 220px;
+    overflow-y: auto;
+    background: var(--color-bg-white);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm);
+    color: var(--color-text);
+}
+
+.queue-warning {
+    background: var(--color-warning-light);
+    color: var(--color-warning);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+}
+
+.queue-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+    padding: var(--space-lg) var(--space-xl);
+    border-top: 1px solid var(--color-border);
+    background: var(--color-bg);
+}
+
+@media (max-width: 600px) {
+    .queue-actions {
+        justify-content: stretch;
+    }
+    .queue-actions .btn {
+        flex: 1 1 45%;
+    }
+}
+
+/* ========================================
    Utilities
    ======================================== */
 

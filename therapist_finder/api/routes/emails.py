@@ -5,7 +5,6 @@ from fastapi import APIRouter, HTTPException
 from ...config import Settings
 from ...email.generator import EmailGenerator
 from ...models import TherapistData, UserInfo
-from ...utils.applescript_generator import create_applescript_content
 from ..schemas import (
     EmailDraftResponse,
     GenerateRequest,
@@ -58,13 +57,13 @@ def _generate_csv(therapists: list[TherapistResponse]) -> str:
 
 @router.post("/generate", response_model=GenerateResponse)
 async def generate_emails(request: GenerateRequest) -> GenerateResponse:
-    """Generate email drafts and AppleScript for therapists.
+    """Generate email drafts for therapists.
 
     Args:
         request: Therapist list and user information.
 
     Returns:
-        Generated email drafts, AppleScript content, and CSV table.
+        Generated email drafts and CSV table.
 
     Raises:
         HTTPException: If generation fails.
@@ -79,7 +78,6 @@ async def generate_emails(request: GenerateRequest) -> GenerateResponse:
         if not therapists_with_email:
             return GenerateResponse(
                 drafts=[],
-                applescript="",
                 table_csv=_generate_csv(request.therapists),
             )
 
@@ -101,15 +99,11 @@ async def generate_emails(request: GenerateRequest) -> GenerateResponse:
             for d in drafts
         ]
 
-        # Generate AppleScript
-        applescript = create_applescript_content(drafts)
-
         # Generate CSV table
         csv_content = _generate_csv(request.therapists)
 
         return GenerateResponse(
             drafts=draft_responses,
-            applescript=applescript,
             table_csv=csv_content,
         )
 
