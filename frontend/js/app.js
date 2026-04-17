@@ -180,18 +180,25 @@ async function handleAddressSearch(event) {
             radius_km: radiusKm,
         });
         state.therapists = result.therapists || [];
+        state.results = null;
 
-        const count = state.therapists.length;
+        const total = state.therapists.length;
         const withEmail = state.therapists.filter((t) => t.email).length;
+        const originLabel = result.origin_address || address;
         showStatus(
             elements.searchStatus,
-            `✓ ${count} therapists near ${result.origin_address || address} `
-                + `(${withEmail} with email)`,
+            `✓ ${withEmail} contactable therapist${withEmail === 1 ? '' : 's'} `
+                + `near ${originLabel} (of ${total} found; only those with an `
+                + `email can receive a mailto draft)`,
             'success'
         );
 
+        // Render the ranked list right away so the user can see results
+        // before filling in personal info.
+        renderTherapists();
+        elements.resultsSection.hidden = false;
         elements.userinfoSection.hidden = false;
-        elements.userinfoSection.scrollIntoView({ behavior: 'smooth' });
+        elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
     } catch (error) {
         console.error('Search error:', error);
         showStatus(
@@ -276,19 +283,23 @@ async function handleUpload() {
     try {
         const result = await parseFile(state.file);
         state.therapists = result.therapists || result;
+        state.results = null;
 
-        const count = state.therapists.length;
-        const withEmail = state.therapists.filter(t => t.email).length;
+        const total = state.therapists.length;
+        const withEmail = state.therapists.filter((t) => t.email).length;
 
         showStatus(
             elements.uploadStatus,
-            `✓ Found ${count} therapists (${withEmail} with email)`,
+            `✓ ${withEmail} contactable therapist${withEmail === 1 ? '' : 's'} `
+                + `(of ${total} parsed; only those with an email can receive a `
+                + `mailto draft)`,
             'success'
         );
 
-        // Show user info section
+        renderTherapists();
+        elements.resultsSection.hidden = false;
         elements.userinfoSection.hidden = false;
-        elements.userinfoSection.scrollIntoView({ behavior: 'smooth' });
+        elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
 
     } catch (error) {
         console.error('Upload error:', error);
@@ -362,43 +373,56 @@ async function handleGenerateEmails(event) {
 // ============================================
 
 /**
- * Display results in the table and summary.
+ * Render the therapist list into the results table.
+ * Safe to call after an address search (no drafts yet) or after email
+ * generation (drafts populated) — the summary adapts to what's available.
  */
-function displayResults() {
+function renderTherapists() {
     const { therapists } = state;
-    const { drafts = [] } = state.results || {};
+    const drafts = state.results?.drafts;
+    const contactable = therapists.filter((t) => !!t.email).length;
 
-    // Summary
-    const totalCount = therapists.length;
-    const emailCount = drafts.length;
+    const contactableLabel = drafts
+        ? `${drafts.length}`
+        : `${contactable}`;
+    const contactableHeader = drafts
+        ? 'Emails Generated'
+        : 'Contactable (have email)';
 
     elements.resultsSummary.innerHTML = `
         <div class="summary-item">
-            <div class="summary-value">${totalCount}</div>
+            <div class="summary-value">${therapists.length}</div>
             <div class="summary-label">Total Therapists</div>
         </div>
         <div class="summary-item">
-            <div class="summary-value">${emailCount}</div>
-            <div class="summary-label">Emails Generated</div>
+            <div class="summary-value">${contactableLabel}</div>
+            <div class="summary-label">${contactableHeader}</div>
         </div>
     `;
 
-    // Table
-    elements.therapistsTbody.innerHTML = therapists.map(therapist => {
-        const hasEmail = !!therapist.email;
-        const statusClass = hasEmail ? 'ready' : 'no-email';
-        const statusText = hasEmail ? 'Ready' : 'No Email';
+    elements.therapistsTbody.innerHTML = therapists
+        .map((therapist) => {
+            const hasEmail = !!therapist.email;
+            const statusClass = hasEmail ? 'ready' : 'no-email';
+            const statusText = hasEmail ? 'Ready' : 'No Email';
+            return `
+                <tr>
+                    <td>${escapeHtml(therapist.name)}</td>
+                    <td>${escapeHtml(therapist.email) || '<span class="text-muted">—</span>'}</td>
+                    <td>${escapeHtml(therapist.phone) || '<span class="text-muted">—</span>'}</td>
+                    <td>${escapeHtml(therapist.address) || '<span class="text-muted">—</span>'}</td>
+                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                </tr>
+            `;
+        })
+        .join('');
+}
 
-        return `
-            <tr>
-                <td>${escapeHtml(therapist.name)}</td>
-                <td>${escapeHtml(therapist.email) || '<span class="text-muted">—</span>'}</td>
-                <td>${escapeHtml(therapist.phone) || '<span class="text-muted">—</span>'}</td>
-                <td>${escapeHtml(therapist.address) || '<span class="text-muted">—</span>'}</td>
-                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-            </tr>
-        `;
-    }).join('');
+/**
+ * Update the results after email generation so the summary shows drafts.
+ */
+function displayResults() {
+    renderTherapists();
 }
 
 // ============================================
