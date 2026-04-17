@@ -101,6 +101,32 @@ FormData { file: File }
 }
 ```
 
+## Free Hosting (GitHub Pages)
+
+The `frontend/` directory is deployed to GitHub Pages automatically on every
+push to `main` via `.github/workflows/pages.yml`.
+
+### One-time setup
+
+1. Push this branch and merge it to `main`.
+2. In the GitHub repo: **Settings → Pages → Build and deployment → Source**:
+   select **GitHub Actions**.
+3. The `Deploy Frontend to GitHub Pages` workflow will publish the site to
+   `https://<user>.github.io/<repo>/`.
+
+### Backend
+
+GitHub Pages serves static files only. The frontend's `/api/*` calls require a
+separately hosted backend. Free options for the FastAPI backend include:
+
+- [Render](https://render.com) (free web service tier)
+- [Fly.io](https://fly.io) (free allowance)
+- [Railway](https://railway.app) (trial credits)
+- [Hugging Face Spaces](https://huggingface.co/spaces) with a Docker SDK
+
+Point `API_BASE` in `frontend/js/api.js` at the deployed backend URL and ensure
+CORS is enabled there.
+
 ## Browser Support
 
 Modern browsers with ES6+ module support:
