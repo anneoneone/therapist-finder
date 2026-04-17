@@ -83,9 +83,7 @@ class OverpassSource(TherapistSource):
             "out center tags;"
         )
 
-    def _element_to_therapist(
-        self, element: dict[str, Any]
-    ) -> TherapistData | None:
+    def _element_to_therapist(self, element: dict[str, Any]) -> TherapistData | None:
         tags = cast(dict[str, str], element.get("tags") or {})
         name = tags.get("name") or tags.get("operator")
         if not name:

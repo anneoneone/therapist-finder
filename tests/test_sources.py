@@ -182,9 +182,7 @@ class TestTherapieDeSource:
             src.close()
 
         assert len(results) == 2
-        heilpraktikerin = next(
-            r for r in results if "Lotus" in r.name
-        )
+        heilpraktikerin = next(r for r in results if "Lotus" in r.name)
         assert heilpraktikerin.insurance_type == "heilpraktiker"
         assert heilpraktikerin.email == "kontakt@lotus-praxis.de"
         assert heilpraktikerin.website == "https://lotus-praxis.de"
@@ -194,9 +192,7 @@ class TestTherapieDeSource:
 class TestGeocoder:
     """Tests for the Nominatim geocoder wrapper."""
 
-    def test_geocode_success(
-        self, httpx_mock: HTTPXMock, tmp_path: Path
-    ) -> None:
+    def test_geocode_success(self, httpx_mock: HTTPXMock, tmp_path: Path) -> None:
         """A Berlin address returns a ``Location`` and caches the response."""
         httpx_mock.add_response(
             url=httpx.URL(

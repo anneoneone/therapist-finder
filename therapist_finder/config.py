@@ -62,8 +62,7 @@ class Settings(BaseSettings):
     )
     scraper_user_agent: str = Field(
         default=(
-            "therapist-finder/0.1 "
-            "(+https://github.com/anneoneone/therapist-finder)"
+            "therapist-finder/0.1 (+https://github.com/anneoneone/therapist-finder)"
         ),
         description="User-Agent sent by scrapers and geocoder",
     )

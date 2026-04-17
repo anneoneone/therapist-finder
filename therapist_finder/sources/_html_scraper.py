@@ -119,9 +119,7 @@ class HTMLScraper(TherapistSource):
         """Return the list entries found on one list-page HTML."""
 
     @abstractmethod
-    def _parse_detail_page(
-        self, html: str, *, fallback: ListEntry
-    ) -> TherapistData:
+    def _parse_detail_page(self, html: str, *, fallback: ListEntry) -> TherapistData:
         """Merge a provider's detail page with the list fallback data."""
 
     def _fetch(self, url: str) -> str | None:

@@ -93,12 +93,12 @@ class PsychInfoSource(HTMLScraper):
             )
         return entries
 
-    def _parse_detail_page(
-        self, html: str, *, fallback: ListEntry
-    ) -> TherapistData:
+    def _parse_detail_page(self, html: str, *, fallback: ListEntry) -> TherapistData:
         soup = BeautifulSoup(html, "lxml")
         name = clean(text_of(soup, "h1, .name")) or fallback.name
-        address = clean(text_of(soup, ".adresse, .address, address")) or fallback.address
+        address = (
+            clean(text_of(soup, ".adresse, .address, address")) or fallback.address
+        )
         telefon = clean(text_of(soup, ".telefon, .phone, .tel")) or fallback.telefon
         email = extract_email_from_html(html)
         website = extract_external_website(soup, exclude_host="psych-info")
@@ -120,7 +120,9 @@ class PsychInfoSource(HTMLScraper):
 
 def _extract_insurance(soup: BeautifulSoup) -> InsuranceType | None:
     text = soup.get_text(" ", strip=True).lower()
-    has_kasse = "kassenzulassung" in text or "kassensitz" in text or "gesetzlich" in text
+    has_kasse = (
+        "kassenzulassung" in text or "kassensitz" in text or "gesetzlich" in text
+    )
     has_privat = (
         "privat" in text or "kostenerstattung" in text or "selbstzahler" in text
     )

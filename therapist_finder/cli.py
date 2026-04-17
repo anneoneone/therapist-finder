@@ -405,9 +405,7 @@ def _build_sources(requested: list[str], settings: Settings) -> list[_SourceLike
             instances.append(
                 TherapieDeSource(
                     user_agent=settings.scraper_user_agent,
-                    min_delay_seconds=max(
-                        settings.scraper_min_delay_seconds, 3.0
-                    ),
+                    min_delay_seconds=max(settings.scraper_min_delay_seconds, 3.0),
                 )
             )
         else:

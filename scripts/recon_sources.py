@@ -123,12 +123,12 @@ async def submit_generic(page: Page) -> None:
             await el.fill(SEARCH_TERM, timeout=3000)
             await page.keyboard.press("Enter")
             return
-        except Exception:
+        except Exception:  # nosec B112 - best-effort selector probe; try the next one
             continue
     # As a last resort, try submitting the first form
     try:
         await page.evaluate("document.forms[0] && document.forms[0].submit()")
-    except Exception:
+    except Exception:  # nosec B110 - recon script: failing to submit is non-fatal
         pass
 
 
@@ -213,7 +213,7 @@ async def record_target(target: Target) -> dict[str, Any]:
             await submit_generic(page)
             try:
                 await page.wait_for_load_state("networkidle", timeout=15000)
-            except Exception:
+            except Exception:  # nosec B110 - timeout is fine, we sleep below anyway
                 pass
             await page.wait_for_timeout(3000)
         except Exception as e:
@@ -222,13 +222,15 @@ async def record_target(target: Target) -> dict[str, Any]:
         html_snapshot = ""
         try:
             html_snapshot = await page.content()
-        except Exception:
+        except Exception:  # nosec B110 - snapshot is best-effort for diagnostics
             pass
 
         await browser.close()
 
     xhr_calls = [
-        c for c in calls if c.resource_type in ("xhr", "fetch") or _looks_like_api(c.url)
+        c
+        for c in calls
+        if c.resource_type in ("xhr", "fetch") or _looks_like_api(c.url)
     ]
 
     return {
@@ -286,9 +288,7 @@ def _render_summary(reports: dict[str, dict[str, Any]]) -> str:
         for call in report["xhr_calls"][:20]:
             ct = call.get("content_type") or ""
             status = call.get("status")
-            lines.append(
-                f"  - `{call['method']} {call['url']}` → {status} {ct}"
-            )
+            lines.append(f"  - `{call['method']} {call['url']}` → {status} {ct}")
         lines.append("")
     return "\n".join(lines)
 
@@ -309,9 +309,7 @@ async def main_async(targets: list[Target]) -> None:
         print(f"  ✓ {count} XHR/API-ish calls → recon/{t.name}.json", file=sys.stderr)
 
     OUT_DIR.mkdir(exist_ok=True)
-    (OUT_DIR / "summary.md").write_text(
-        _render_summary(reports), encoding="utf-8"
-    )
+    (OUT_DIR / "summary.md").write_text(_render_summary(reports), encoding="utf-8")
     print("\nsee recon/summary.md for an overview.", file=sys.stderr)
 
 

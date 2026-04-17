@@ -91,7 +91,7 @@ warn_return_any = true
 strict_equality = true
 
 [[tool.mypy.overrides]]
-module = ["pdfplumber", "PyPDF2"]
+module = ["pdfplumber", "PyPDF2", "bs4", "playwright", "playwright.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
