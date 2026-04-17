@@ -45,6 +45,59 @@ excluded: their ToS explicitly prohibit automated extraction.
   falling back to email. Merged records union their non-null fields and record
   all contributing sources in `sources`.
 
+## Finding hidden JSON APIs (recon)
+
+The PTK Berlin and Ärztekammer Berlin scrapers use best-effort CSS selectors
+because their HTML isn't publicly documented. Before hardening them, run the
+recon script to see whether the sites are really SPAs backed by a JSON API
+(like `arztsuche.116117.de`) — if they are, replace the HTML scraper with a
+JSON client for much better reliability.
+
+### Running the recon
+
+```bash
+poetry install --with dev
+poetry run playwright install chromium
+poetry run python scripts/recon_sources.py
+```
+
+Optional flags:
+
+```bash
+# Only probe specific targets
+poetry run python scripts/recon_sources.py --only ptk_berlin,psych_info
+
+# Add an extra target on the fly
+poetry run python scripts/recon_sources.py \
+    --extra kbv=https://arztsuche.kbv.de/
+```
+
+The script launches headless Chromium, loads each target, enumerates its
+forms / scripts / iframes, submits a `"Berlin"` search, and captures every
+XHR/fetch call the page makes. Output lands in `recon/`:
+
+- `recon/summary.md` — human-readable overview of each site.
+- `recon/<site>.json` — full capture (request + response headers, bodies,
+  discovery JSON, first 20 KB of the final HTML snapshot).
+
+Look at `recon/summary.md` first — if a site lists clean `GET /api/...` or
+`POST /search` calls returning `application/json`, that's your API. Replace
+the HTML-scraping `TherapistSource` with an httpx client that posts the same
+payload; reuse the structure of `therapist_finder/parsers/arztsuche_api.py`.
+
+### Default targets
+
+| name          | URL                                                                           |
+|---------------|-------------------------------------------------------------------------------|
+| `ptk_berlin`  | `https://www.psychotherapeutenkammer-berlin.de/psychotherapeutensuche`        |
+| `psych_info`  | `https://www.psych-info.de/psychotherapeutensuche/` (used by many Landeskammern) |
+| `aeka_berlin` | `https://www.arztauskunft-berlin.de/`                                         |
+| `kv_berlin`   | `https://www.kvberlin.de/fuer-patienten/arzt-und-psychotherapeutensuche`      |
+
+Psych-Info powers the therapist search for several German Landeskammern, so
+if it exposes a JSON API, a single integration replaces `ptk_berlin` and
+extends coverage beyond Berlin.
+
 ## Configuration
 
 Override via environment variables (prefix `THERAPIST_FINDER_`) or `.env`:
