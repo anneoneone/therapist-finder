@@ -114,18 +114,27 @@ push to `main` via `.github/workflows/pages.yml`.
 3. The `Deploy Frontend to GitHub Pages` workflow will publish the site to
    `https://<user>.github.io/<repo>/`.
 
-### Backend
+### Backend on Render
 
-GitHub Pages serves static files only. The frontend's `/api/*` calls require a
-separately hosted backend. Free options for the FastAPI backend include:
+GitHub Pages serves static files only. The FastAPI backend is deployed
+separately to Render using the `render.yaml` blueprint at the repo root.
 
-- [Render](https://render.com) (free web service tier)
-- [Fly.io](https://fly.io) (free allowance)
-- [Railway](https://railway.app) (trial credits)
-- [Hugging Face Spaces](https://huggingface.co/spaces) with a Docker SDK
+1. Sign in at [render.com](https://render.com) and click **New → Blueprint**.
+2. Point it at this GitHub repo; Render reads `render.yaml` and creates the
+   `therapist-finder-api` web service on the free plan.
+3. Set the `CORS_ORIGINS` env var to your Pages URL, e.g.
+   `https://anneoneone.github.io`.
+4. After the first deploy Render prints the public URL, e.g.
+   `https://therapist-finder-api.onrender.com`.
+5. Point the frontend at that URL by adding a script tag to `index.html`
+   **before** the `app.js` import:
 
-Point `API_BASE` in `frontend/js/api.js` at the deployed backend URL and ensure
-CORS is enabled there.
+   ```html
+   <script>window.API_BASE = 'https://therapist-finder-api.onrender.com/api';</script>
+   ```
+
+Note: Render's free web services sleep after ~15 min of inactivity and take a
+few seconds to wake on the first request.
 
 ## Browser Support
 
