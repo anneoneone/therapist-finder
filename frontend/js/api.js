@@ -81,6 +81,38 @@ export async function parseFile(file) {
 }
 
 /**
+ * Search for the N closest therapists to a Berlin address.
+ * @param {Object} params
+ * @param {string} params.address - Street address to search around
+ * @param {number} [params.max_results=20] - Return the N closest providers
+ * @param {string} [params.specialty='Psychotherapeut']
+ * @param {number} [params.radius_km=15]
+ * @param {string[]} [params.sources] - Source names (defaults to server-side CI-safe set)
+ * @returns {Promise<Object>} - Search response with ranked therapists
+ */
+export async function searchByAddress({
+    address,
+    max_results = 20,
+    specialty = 'Psychotherapeut',
+    radius_km = 15,
+    sources,
+}) {
+    return request('/therapists/search-by-address', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            address,
+            max_results,
+            specialty,
+            radius_km,
+            ...(sources ? { sources } : {}),
+        }),
+    });
+}
+
+/**
  * Generate email drafts for therapists.
  * @param {Array} therapists - List of therapist objects
  * @param {Object} userInfo - User information
