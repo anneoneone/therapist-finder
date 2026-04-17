@@ -55,6 +55,16 @@ JSON client for much better reliability.
 
 ### Running the recon
 
+You can run the recon in CI without touching a terminal:
+
+1. Open the repo on GitHub → **Actions** → **Recon Berlin directories** →
+   **Run workflow** (optionally fill `only` or `extra`).
+2. When the job finishes, open the run — the `summary.md` content is
+   rendered inline as the job summary, and the full `recon/` folder is
+   attached as a downloadable artifact (`recon-<run-id>`).
+
+Locally:
+
 ```bash
 poetry install --with dev
 poetry run playwright install chromium
