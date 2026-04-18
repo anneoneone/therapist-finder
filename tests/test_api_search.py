@@ -24,6 +24,7 @@ def test_search_by_address_success() -> None:
         address="Kastanienallee 12, 10435 Berlin",
         email="anna@beispiel.de",
         telefon="030 1234567",
+        therapieform=["Verhaltenstherapie"],
         lat=52.5396,
         lon=13.4127,
         sources=["osm"],
@@ -56,6 +57,7 @@ def test_search_by_address_success() -> None:
                 "address": "Kastanienallee 12, 10435 Berlin",
                 "max_results": 5,
                 "sources": ["osm"],
+                "specialty": "psychotherapie",
             },
         )
 
@@ -64,9 +66,77 @@ def test_search_by_address_success() -> None:
     assert body["total"] == 1
     assert body["with_email"] == 1
     assert body["origin_address"] == "Kastanienallee 12, 10435 Berlin"
+    assert body["specialty"] == "psychotherapie"
+    assert body["specialty_label"] == "Psychotherapie"
     assert body["therapists"][0]["name"] == "Dr. Anna Beispiel"
     assert body["therapists"][0]["email"] == "anna@beispiel.de"
     assert body["therapists"][0]["sources"] == ["osm"]
+    assert body["therapists"][0]["specialty"] == "psychotherapie"
+
+
+def test_search_by_address_filters_by_specialty() -> None:
+    """Picking 'hno' drops a psychotherapist and keeps the HNO practice."""
+    psycho = TherapistData(
+        name="Dr. Anna Beispiel",
+        address="Kastanienallee 12, 10435 Berlin",
+        therapieform=["Verhaltenstherapie"],
+        lat=52.5396,
+        lon=13.4127,
+        sources=["osm"],
+    )
+    hno = TherapistData(
+        name="HNO-Praxis Kreuzberg-Süd",
+        address="Gneisenaustraße 44, 10961 Berlin",
+        lat=52.4930,
+        lon=13.3890,
+        sources=["osm"],
+    )
+
+    with (
+        patch("therapist_finder.api.routes.therapists.Geocoder") as mock_geocoder_cls,
+        patch("therapist_finder.api.routes.therapists._build_source") as mock_build,
+    ):
+        mock_geocoder_cls.return_value.geocode.return_value = _fake_location()
+
+        class _FakeSource:
+            name = "osm"
+
+            def search(self, params: object) -> list[TherapistData]:
+                return [psycho, hno]
+
+            def close(self) -> None:
+                return None
+
+        mock_build.side_effect = lambda name, settings: (
+            _FakeSource() if name == "osm" else None
+        )
+
+        client = TestClient(app)
+        resp = client.post(
+            "/api/therapists/search-by-address",
+            json={
+                "address": "Kastanienallee 12, 10435 Berlin",
+                "max_results": 10,
+                "sources": ["osm"],
+                "specialty": "hno",
+            },
+        )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert [t["name"] for t in body["therapists"]] == ["HNO-Praxis Kreuzberg-Süd"]
+    assert body["specialty"] == "hno"
+
+
+def test_list_specialties_endpoint() -> None:
+    """The /specialties endpoint lists the options for the UI dropdown."""
+    client = TestClient(app)
+    resp = client.get("/api/therapists/specialties")
+    assert resp.status_code == 200
+    body = resp.json()
+    keys = {s["key"] for s in body["specialties"]}
+    assert {"psychotherapie", "hno", "all"}.issubset(keys)
+    assert body["default"] == "psychotherapie"
 
 
 def test_search_by_address_invalid_address() -> None:

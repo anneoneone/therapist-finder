@@ -7,6 +7,7 @@ import {
     APIError,
     downloadFile,
     generateEmails,
+    listSpecialties,
     parseFile,
     searchByAddress,
 } from './api.js';
@@ -40,6 +41,7 @@ const elements = {
     searchAddress: document.getElementById('search-address'),
     searchMax: document.getElementById('search-max'),
     searchRadius: document.getElementById('search-radius'),
+    searchSpecialty: document.getElementById('search-specialty'),
     toggleUpload: document.getElementById('toggle-upload'),
     toggleSearch: document.getElementById('toggle-search'),
 
@@ -165,11 +167,15 @@ async function handleAddressSearch(event) {
 
     const maxResults = Number(elements.searchMax.value) || 20;
     const radiusKm = Number(elements.searchRadius.value) || 15;
+    const specialty = elements.searchSpecialty?.value || 'psychotherapie';
+    const specialtyLabel =
+        elements.searchSpecialty?.selectedOptions?.[0]?.textContent?.trim()
+        || specialty;
 
     setButtonLoading(elements.searchBtn, true);
     showStatus(
         elements.searchStatus,
-        `Crawling public directories near ${address}…`,
+        `Crawling public directories near ${address} for ${specialtyLabel}…`,
         'info'
     );
 
@@ -178,6 +184,7 @@ async function handleAddressSearch(event) {
             address,
             max_results: maxResults,
             radius_km: radiusKm,
+            specialty,
         });
         state.therapists = result.therapists || [];
         state.results = null;
@@ -185,11 +192,12 @@ async function handleAddressSearch(event) {
         const total = state.therapists.length;
         const withEmail = state.therapists.filter((t) => t.email).length;
         const originLabel = result.origin_address || address;
+        const specLabel = result.specialty_label || specialtyLabel;
         showStatus(
             elements.searchStatus,
-            `✓ ${withEmail} contactable therapist${withEmail === 1 ? '' : 's'} `
-                + `near ${originLabel} (of ${total} found; only those with an `
-                + `email can receive a mailto draft)`,
+            `✓ ${total} ${specLabel} provider${total === 1 ? '' : 's'} `
+                + `near ${originLabel} (${withEmail} with email; only those `
+                + `can receive a mailto draft)`,
             'success'
         );
 
@@ -405,9 +413,11 @@ function renderTherapists() {
             const hasEmail = !!therapist.email;
             const statusClass = hasEmail ? 'ready' : 'no-email';
             const statusText = hasEmail ? 'Ready' : 'No Email';
+            const specialty = therapist.specialty_label || therapist.specialty || '';
             return `
                 <tr>
                     <td>${escapeHtml(therapist.name)}</td>
+                    <td>${escapeHtml(specialty) || '<span class="text-muted">—</span>'}</td>
                     <td>${escapeHtml(therapist.email) || '<span class="text-muted">—</span>'}</td>
                     <td>${escapeHtml(therapist.phone) || '<span class="text-muted">—</span>'}</td>
                     <td>${escapeHtml(therapist.address) || '<span class="text-muted">—</span>'}</td>
@@ -416,6 +426,33 @@ function renderTherapists() {
             `;
         })
         .join('');
+}
+
+/**
+ * Populate the specialty dropdown from the backend catalog. Falls back
+ * silently to the static options baked into index.html if the API is
+ * unreachable (e.g. during local file:// testing).
+ */
+async function loadSpecialtyOptions() {
+    const select = elements.searchSpecialty;
+    if (!select) return;
+    try {
+        const { specialties = [], default: defaultKey } = await listSpecialties();
+        if (!specialties.length) return;
+        const previous = select.value;
+        select.innerHTML = specialties
+            .map(
+                (s) =>
+                    `<option value="${escapeHtml(s.key)}">${escapeHtml(s.label)}</option>`,
+            )
+            .join('');
+        const desired = previous && specialties.some((s) => s.key === previous)
+            ? previous
+            : defaultKey;
+        if (desired) select.value = desired;
+    } catch (error) {
+        console.warn('Failed to load specialties, keeping static options:', error);
+    }
 }
 
 /**
@@ -442,9 +479,10 @@ function handleDownloadTable() {
     } else {
         // Fallback: generate client-side
         const { therapists } = state;
-        const headers = ['Name', 'Email', 'Phone', 'Address'];
+        const headers = ['Name', 'Specialty', 'Email', 'Phone', 'Address'];
         const rows = therapists.map(t => [
             t.name || '',
+            t.specialty_label || t.specialty || '',
             t.email || '',
             t.phone || '',
             t.address || '',
@@ -766,6 +804,7 @@ function initEventListeners() {
 
 function init() {
     initEventListeners();
+    loadSpecialtyOptions();
     console.log('Therapist Finder initialized');
 }
 

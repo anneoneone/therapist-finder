@@ -85,7 +85,7 @@ export async function parseFile(file) {
  * @param {Object} params
  * @param {string} params.address - Street address to search around
  * @param {number} [params.max_results=20] - Return the N closest providers
- * @param {string} [params.specialty='Psychotherapeut']
+ * @param {string} [params.specialty='psychotherapie'] - Specialty slug (see listSpecialties)
  * @param {number} [params.radius_km=15]
  * @param {string[]} [params.sources] - Source names (defaults to server-side CI-safe set)
  * @returns {Promise<Object>} - Search response with ranked therapists
@@ -93,7 +93,7 @@ export async function parseFile(file) {
 export async function searchByAddress({
     address,
     max_results = 20,
-    specialty = 'Psychotherapeut',
+    specialty = 'psychotherapie',
     radius_km = 15,
     sources,
 }) {
@@ -110,6 +110,14 @@ export async function searchByAddress({
             ...(sources ? { sources } : {}),
         }),
     });
+}
+
+/**
+ * Fetch the catalog of selectable specialties (for the search dropdown).
+ * @returns {Promise<{specialties: Array<{key: string, label: string}>, default: string}>}
+ */
+export async function listSpecialties() {
+    return request('/therapists/specialties');
 }
 
 /**

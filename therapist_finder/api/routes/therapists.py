@@ -11,6 +11,7 @@ from ...models import TherapistData
 from ...parsers.arztsuche_api import Arztsuche116117Source
 from ...parsers.pdf_parser import PDFParser
 from ...parsers.text_parser import TextParser
+from ...sources import specialties
 from ...sources.base import SearchParams
 from ...sources.geocode import Geocoder, GeocodingError
 from ...sources.merger import merge_and_rank
@@ -21,6 +22,8 @@ from ..schemas import (
     ParseResponse,
     SearchByAddressRequest,
     SearchByAddressResponse,
+    SpecialtiesResponse,
+    SpecialtyOption,
     TherapistResponse,
 )
 
@@ -50,12 +53,16 @@ def _build_source(name: str, settings: Settings) -> object | None:
 
 
 def _therapist_to_response(t: TherapistData) -> TherapistResponse:
+    key = t.specialty or specialties.infer_key(t)
+    label = specialties.SPECIALTIES[key].label if key in specialties.SPECIALTIES else None
     return TherapistResponse(
         name=t.name,
         address=t.address,
         phone=t.telefon,
         email=t.email,
         salutation=t.salutation,
+        specialty=key,
+        specialty_label=label,
         distance_km=t.distance_km,
         sources=list(t.sources),
     )
@@ -87,8 +94,9 @@ async def search_by_address(
         geocoder.close()
         raise HTTPException(status_code=502, detail=f"Geocoding failed: {e}") from e
 
+    spec = specialties.resolve(request.specialty)
     params = SearchParams(
-        specialty=request.specialty,
+        specialty=spec.key,
         lat=origin.lat,
         lon=origin.lon,
         radius_km=request.radius_km,
@@ -116,14 +124,32 @@ async def search_by_address(
     for src in sources:
         src.close()  # type: ignore[attr-defined]
 
+    # Tag every hit with its inferred normalized specialty before we
+    # filter, so the post-filter can lean on a single stable field rather
+    # than re-running regexes per-source.
+    tagged: dict[str, list[TherapistData]] = {}
+    for src_name, entries in results.items():
+        tagged[src_name] = [
+            (
+                e.model_copy(update={"specialty": specialties.infer_key(e)})
+                if e.specialty is None
+                else e
+            )
+            for e in entries
+        ]
+
     merged = merge_and_rank(
-        results,
+        tagged,
         origin.lat,
         origin.lon,
-        request.max_results,
+        # Over-fetch so the post-filter has room to drop non-matching hits
+        # without starving the response.
+        request.max_results * 4 if not specialties.is_all(spec) else request.max_results,
         geocoder=geocoder,
     )
     geocoder.close()
+
+    merged = specialties.filter_results(spec, merged)[: request.max_results]
 
     responses = [_therapist_to_response(t) for t in merged]
     with_email = sum(1 for t in merged if t.email)
@@ -134,6 +160,20 @@ async def search_by_address(
         origin_address=origin.display_name,
         origin_lat=origin.lat,
         origin_lon=origin.lon,
+        specialty=spec.key,
+        specialty_label=spec.label,
+    )
+
+
+@router.get("/specialties", response_model=SpecialtiesResponse)
+async def list_specialties() -> SpecialtiesResponse:
+    """Return the specialties offered in the search dropdown."""
+    return SpecialtiesResponse(
+        specialties=[
+            SpecialtyOption(key=s.key, label=s.label)
+            for s in specialties.all_specialties()
+        ],
+        default=specialties.DEFAULT_KEY,
     )
 
 
