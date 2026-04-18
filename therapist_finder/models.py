@@ -38,6 +38,7 @@ class TherapistData(BaseModel):
     website: str | None = None
     languages: list[str] = []
     insurance_type: InsuranceType | None = None
+    specialty: str | None = None
     lat: float | None = None
     lon: float | None = None
     distance_km: float | None = None

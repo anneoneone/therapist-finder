@@ -33,6 +33,7 @@ from therapist_finder.sources._html_scraper import (
     text_of,
 )
 from therapist_finder.sources.base import SearchParams
+from therapist_finder.sources.specialties import resolve
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +66,9 @@ class PsychInfoSource(HTMLScraper):
         # psych-info search takes an ``ort`` (city/PLZ) query parameter; the
         # exact path isn't publicly documented, so we keep it configurable.
         pages = max(1, (params.limit_per_source + 19) // 20)
+        verfahren = resolve(params.specialty).verfahren
         return [
-            f"{self.base_url}/suche?ort=Berlin&verfahren={_verfahren(params.specialty)}&seite={i + 1}"
+            f"{self.base_url}/suche?ort=Berlin&verfahren={verfahren}&seite={i + 1}"
             for i in range(pages)
         ]
 
@@ -135,10 +137,3 @@ def _extract_insurance(soup: BeautifulSoup) -> InsuranceType | None:
     return None
 
 
-def _verfahren(specialty: str) -> str:
-    key = specialty.strip().lower()
-    if "kinder" in key:
-        return "KJP"
-    if "psycholog" in key or "psychotherap" in key:
-        return "PP"
-    return ""

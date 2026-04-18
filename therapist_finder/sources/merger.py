@@ -122,6 +122,7 @@ def _merge_one(existing: TherapistData, new: TherapistData) -> TherapistData:
             "sprechzeiten": _merge_list(existing.sprechzeiten, new.sprechzeiten),
             "languages": _merge_list(existing.languages, new.languages),
             "insurance_type": existing.insurance_type or new.insurance_type,
+            "specialty": existing.specialty or new.specialty,
             "lat": existing.lat if existing.lat is not None else new.lat,
             "lon": existing.lon if existing.lon is not None else new.lon,
             "sources": merged_sources,

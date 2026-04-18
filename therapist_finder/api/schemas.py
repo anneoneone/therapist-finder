@@ -28,6 +28,8 @@ class TherapistResponse(BaseModel):
     phone: str | None = None
     email: str | None = None
     salutation: str | None = None
+    specialty: str | None = None
+    specialty_label: str | None = None
     distance_km: float | None = None
     sources: list[str] = []
 
@@ -52,7 +54,14 @@ class SearchByAddressRequest(BaseModel):
     max_results: int = Field(
         20, ge=1, le=100, description="Return the N closest providers"
     )
-    specialty: str = Field("Psychotherapeut", description="Specialty filter")
+    specialty: str = Field(
+        "psychotherapie",
+        description=(
+            "Specialty filter. Accepts a slug from the /specialties registry "
+            "(e.g. 'psychotherapie', 'hno', 'all') or a legacy German label "
+            "like 'Psychotherapeut'."
+        ),
+    )
     radius_km: float = Field(
         15.0, ge=0.5, le=50.0, description="Per-source search radius"
     )
@@ -74,6 +83,22 @@ class SearchByAddressResponse(BaseModel):
     origin_address: str
     origin_lat: float
     origin_lon: float
+    specialty: str | None = None
+    specialty_label: str | None = None
+
+
+class SpecialtyOption(BaseModel):
+    """A selectable specialty for the search UI dropdown."""
+
+    key: str
+    label: str
+
+
+class SpecialtiesResponse(BaseModel):
+    """List of selectable specialties, in display order."""
+
+    specialties: list[SpecialtyOption]
+    default: str
 
 
 class EmailDraftResponse(BaseModel):

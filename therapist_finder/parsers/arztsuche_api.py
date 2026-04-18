@@ -210,6 +210,7 @@ class Arztsuche116117Source:
         """
         from therapist_finder.models import TherapistData
         from therapist_finder.sources.base import SearchParams as SrcParams
+        from therapist_finder.sources.specialties import resolve
 
         if not isinstance(params, SrcParams):
             raise TypeError(
@@ -220,7 +221,7 @@ class Arztsuche116117Source:
         radius = max(1, min(100, int(round(params.radius_km))))
         max_results = max(1, min(50, params.limit_per_source))
         search_data = {
-            "specialty": params.specialty,
+            "specialty": resolve(params.specialty).de_label,
             "lat": params.lat,
             "lon": params.lon,
             "radius": radius,

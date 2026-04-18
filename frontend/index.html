@@ -38,9 +38,33 @@
                                 autocomplete="street-address"
                                 required>
                             <p class="dropzone-hint">
-                                We'll return the N closest psychotherapists / doctors,
-                                sorted by distance to this address.
+                                We'll return the N closest providers of the
+                                chosen specialty, sorted by distance to this
+                                address.
                             </p>
+                        </div>
+                        <div class="form-group">
+                            <label for="search-specialty">Doctor kind</label>
+                            <select id="search-specialty" name="specialty">
+                                <!-- Options are populated from
+                                     /api/therapists/specialties on load;
+                                     the fallback list below ships with the
+                                     static site so the form still works
+                                     before the API replies. -->
+                                <option value="psychotherapie" selected>Psychotherapie</option>
+                                <option value="kinder_jugend_psychotherapie">Kinder- &amp; Jugendpsychotherapie</option>
+                                <option value="psychiatrie">Psychiatrie</option>
+                                <option value="kinderarzt">Kinder- &amp; Jugendmedizin</option>
+                                <option value="allgemeinmedizin">Allgemeinmedizin / Hausarzt</option>
+                                <option value="hno">HNO (Hals-Nasen-Ohren)</option>
+                                <option value="gynaekologie">Gynäkologie</option>
+                                <option value="dermatologie">Dermatologie (Haut)</option>
+                                <option value="augenarzt">Augenheilkunde</option>
+                                <option value="orthopaedie">Orthopädie</option>
+                                <option value="zahnarzt">Zahnarzt</option>
+                                <option value="heilpraktiker">Heilpraktiker:in (Psychotherapie)</option>
+                                <option value="all">Alle Ärzte &amp; Therapeut:innen</option>
+                            </select>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
@@ -177,6 +201,7 @@
                             <thead>
                                 <tr>
                                     <th>Name</th>
+                                    <th>Specialty</th>
                                     <th>Email</th>
                                     <th>Phone</th>
                                     <th>Address</th>

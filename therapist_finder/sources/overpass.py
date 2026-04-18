@@ -9,14 +9,9 @@ import httpx
 
 from therapist_finder.models import TherapistData
 from therapist_finder.sources.base import SearchParams, TherapistSource
+from therapist_finder.sources.specialties import is_all, resolve
 
 logger = logging.getLogger(__name__)
-
-_SPECIALTY_KEYWORDS = {
-    "psychotherapeut": ("psychotherapist",),
-    "psychiater": ("psychiatrist",),
-    "arzt": ("doctor",),
-}
 
 
 class OverpassSource(TherapistSource):
@@ -67,21 +62,30 @@ class OverpassSource(TherapistSource):
             self._client.close()
 
     def _build_query(self, params: SearchParams) -> str:
-        keywords = _keywords_for(params.specialty)
-        # Match psychotherapist, doctor, etc. via both ``healthcare`` and
-        # ``amenity`` tags; use a regex alternation to keep the query short.
-        regex = "|".join(keywords)
+        spec = resolve(params.specialty)
+        # Match the specialty against both the ``healthcare`` /
+        # ``healthcare:speciality`` tags and the generic
+        # ``amenity=doctors`` hits. For the catch-all we keep the generic
+        # amenity fallback; for a specific specialty we only include it
+        # when the dictionary says "doctor" is one of its OSM aliases, to
+        # avoid pulling HNO/Pädiatrie/... into e.g. a Psychotherapie query.
+        regex = "|".join(spec.osm_values) or spec.key
         radius_m = int(params.radius_km * 1000)
-        return (
+        q = (
             "[out:json][timeout:45];"
             "("
-            f'nwr["healthcare"~"{regex}"]'
+            f'nwr["healthcare"~"{regex}",i]'
             f"(around:{radius_m},{params.lat},{params.lon});"
-            f'nwr["amenity"="doctors"]'
+            f'nwr["healthcare:speciality"~"{regex}",i]'
             f"(around:{radius_m},{params.lat},{params.lon});"
-            ");"
-            "out center tags;"
         )
+        if is_all(spec) or "doctor" in spec.osm_values:
+            q += (
+                f'nwr["amenity"="doctors"]'
+                f"(around:{radius_m},{params.lat},{params.lon});"
+            )
+        q += ");out center tags;"
+        return q
 
     def _element_to_therapist(self, element: dict[str, Any]) -> TherapistData | None:
         tags = cast(dict[str, str], element.get("tags") or {})
@@ -110,15 +114,6 @@ class OverpassSource(TherapistSource):
             lon=lon,
             sources=[self.name],
         )
-
-
-def _keywords_for(specialty: str) -> tuple[str, ...]:
-    key = (specialty or "").strip().lower()
-    for label, keywords in _SPECIALTY_KEYWORDS.items():
-        if label in key:
-            return keywords
-    # Default: cover therapists and doctors both
-    return ("psychotherapist", "doctor", "psychiatrist")
 
 
 def _element_coords(element: dict[str, Any]) -> tuple[float | None, float | None]:
