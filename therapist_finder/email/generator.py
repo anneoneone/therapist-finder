@@ -14,10 +14,22 @@ class EmailGenerator:
         self.template_manager = TemplateManager(settings)
 
     def create_drafts(
-        self, therapists: list[TherapistData], user_info: UserInfo
+        self,
+        therapists: list[TherapistData],
+        user_info: UserInfo,
+        template_body: str | None = None,
     ) -> list[EmailDraft]:
-        """Create email drafts for therapists with email addresses."""
-        template = self.template_manager.load_template()
+        """Create email drafts for therapists with email addresses.
+
+        If ``template_body`` is provided, it is used verbatim instead of
+        loading the on-disk default. This is the hook the frontend's
+        "Mail template body" step uses to send an edited template.
+        """
+        template = (
+            template_body
+            if template_body is not None
+            else self.template_manager.load_template()
+        )
         drafts = []
 
         for therapist in therapists:

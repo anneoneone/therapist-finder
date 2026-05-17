@@ -99,19 +99,32 @@ export async function parseUrl(url) {
  * Generate email drafts for therapists.
  * @param {Array} therapists - List of therapist objects
  * @param {Object} userInfo - User information
+ * @param {string|null} [templateBody] - Optional custom template body
  * @returns {Promise<Object>} - Generated emails and files
  */
-export async function generateEmails(therapists, userInfo) {
+export async function generateEmails(therapists, userInfo, templateBody = null) {
+    const payload = {
+        therapists,
+        user_info: userInfo,
+    };
+    if (templateBody != null) {
+        payload.template_body = templateBody;
+    }
     return request('/emails/generate', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            therapists,
-            user_info: userInfo,
-        }),
+        body: JSON.stringify(payload),
     });
+}
+
+/**
+ * Fetch the default email template body from the server.
+ * @returns {Promise<{body: string}>}
+ */
+export async function getTemplate() {
+    return request('/emails/template');
 }
 
 /**

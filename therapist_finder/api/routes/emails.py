@@ -4,15 +4,38 @@ from fastapi import APIRouter, HTTPException
 
 from ...config import Settings
 from ...email.generator import EmailGenerator
+from ...email.templates import TemplateManager
 from ...models import TherapistData, UserInfo
 from ..schemas import (
     EmailDraftResponse,
     GenerateRequest,
     GenerateResponse,
+    TemplateResponse,
     TherapistResponse,
 )
 
 router = APIRouter(prefix="/emails", tags=["emails"])
+
+
+@router.get("/template", response_model=TemplateResponse)
+async def get_template() -> TemplateResponse:
+    """Return the on-disk default email template body.
+
+    Used by the frontend's "Mail template body" step to pre-fill the
+    editor textarea so the user can tweak the body before drafts are
+    generated.
+    """
+    try:
+        settings = Settings()
+        body = TemplateManager(settings).load_template()
+        return TemplateResponse(body=body)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load template: {str(e)}",
+        ) from e
 
 
 def _convert_to_therapist_data(therapist: TherapistResponse) -> TherapistData:
@@ -86,7 +109,9 @@ async def generate_emails(request: GenerateRequest) -> GenerateResponse:
         user_info = _convert_to_user_info(request)
 
         # Generate email drafts
-        drafts = generator.create_drafts(therapist_data, user_info)
+        drafts = generator.create_drafts(
+            therapist_data, user_info, template_body=request.template_body
+        )
 
         # Convert drafts to response format
         draft_responses = [
