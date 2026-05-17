@@ -7,9 +7,12 @@ import {
     APIError,
     downloadFile,
     generateEmails,
+    getContactCounts,
+    getMyContacts,
     getTemplate,
     parseFile,
     parseUrl,
+    recordContact,
 } from './api.js';
 import {
     SUPPORTED_LANGS,
@@ -26,7 +29,29 @@ import {
 
 const STATE_STORAGE_KEY = 'therapist-finder:state';
 const CONTACTED_STORAGE_KEY = 'therapist-finder:contacted-emails';
+const BROWSER_ID_STORAGE_KEY = 'therapist-finder:browser-id';
 const MAILTO_MAX_LENGTH = 1900;
+
+/**
+ * Return a stable anonymous identifier for this browser, generating one
+ * on first use. Used by the backend to attribute contact events without
+ * any login flow.
+ */
+function getBrowserId() {
+    try {
+        let id = localStorage.getItem(BROWSER_ID_STORAGE_KEY);
+        if (!id) {
+            id =
+                typeof crypto !== 'undefined' && crypto.randomUUID
+                    ? crypto.randomUUID()
+                    : `anon-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            localStorage.setItem(BROWSER_ID_STORAGE_KEY, id);
+        }
+        return id;
+    } catch {
+        return `anon-${Date.now()}`;
+    }
+}
 const TRUNCATION_MARKER = '\n\n[… truncated — use "Copy body" to paste full text]';
 
 const STEPS = ['url', 'overview', 'me', 'template', 'send'];
@@ -632,7 +657,47 @@ function currentQueueDraft() {
     return items[index] || null;
 }
 
-function initSendView() {
+/**
+ * Build the send queue, prioritising therapists with the fewest global
+ * contact records (the "balancer") and filtering out emails this browser
+ * has already contacted. Falls back to localStorage-only behaviour if the
+ * backend is unreachable so the flow still works offline.
+ */
+async function buildBalancedQueue(drafts) {
+    const draftsWithEmail = drafts.filter((d) => d.to);
+    const emails = draftsWithEmail.map((d) => d.to.toLowerCase());
+    const localContacted = loadContactedEmails();
+
+    let counts = {};
+    let myContacted = new Set(localContacted);
+    try {
+        const browserId = getBrowserId();
+        const [countsRes, mineRes] = await Promise.all([
+            getContactCounts(emails),
+            getMyContacts(browserId),
+        ]);
+        counts = countsRes.counts || {};
+        for (const email of mineRes.emails || []) {
+            myContacted.add(email.toLowerCase());
+        }
+    } catch (error) {
+        console.warn('Falling back to localStorage-only queue:', error);
+    }
+
+    const items = draftsWithEmail
+        .map((draft, originalIndex) => ({
+            draft,
+            originalIndex,
+            count: counts[draft.to.toLowerCase()] ?? 0,
+        }))
+        .filter(({ draft }) => !myContacted.has(draft.to.toLowerCase()))
+        .sort((a, b) => a.count - b.count || a.originalIndex - b.originalIndex)
+        .map(({ draft }) => draft);
+
+    return items;
+}
+
+async function initSendView() {
     const drafts = (state.results && state.results.drafts) || [];
     if (drafts.length === 0) {
         showStatus(elements.queueStatus, t('step5.statusNoDrafts'), 'warning');
@@ -647,8 +712,7 @@ function initSendView() {
         state.queue.index >= state.queue.items.length;
 
     if (needsRebuild) {
-        const contacted = loadContactedEmails();
-        const items = drafts.filter((d) => d.to && !contacted.has(d.to.toLowerCase()));
+        const items = await buildBalancedQueue(drafts);
         state.queue = { items, index: 0 };
         persistState();
     }
@@ -710,6 +774,11 @@ function handleQueueOpen() {
     document.body.removeChild(link);
 
     markEmailContacted(draft.to);
+    // Best-effort backend persistence; the localStorage write above keeps
+    // the user-visible behaviour working even if the API is unreachable.
+    recordContact(draft.to, getBrowserId()).catch((error) => {
+        console.warn('Failed to record contact on backend:', error);
+    });
     elements.queueNext.disabled = false;
     elements.queueOpen.disabled = true;
     showStatus(elements.queueStatus, t('step5.statusMailOpened'), 'info');

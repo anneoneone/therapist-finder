@@ -1,5 +1,7 @@
 """FastAPI application entry point."""
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 import os
 from pathlib import Path
 
@@ -8,14 +10,28 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .routes import emails, therapists
+from . import contacts_store
+from .routes import contacts, emails, therapists
 from .schemas import HealthResponse
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Initialise the contacts SQLite schema on app startup.
+
+    Done here (not at import time) so importing the app for tests or tooling
+    doesn't create a stray DB file at the project root.
+    """
+    contacts_store.init_db()
+    yield
+
 
 # Create FastAPI app
 app = FastAPI(
     title="Therapist Finder API",
     description="API for parsing therapist data and generating email drafts",
     version="1.0.0",
+    lifespan=_lifespan,
 )
 
 _default_origins = [
@@ -69,6 +85,7 @@ async def health_check() -> HealthResponse:
 # Register API routes
 app.include_router(therapists.router, prefix="/api")
 app.include_router(emails.router, prefix="/api")
+app.include_router(contacts.router, prefix="/api")
 
 
 # Serve frontend static files

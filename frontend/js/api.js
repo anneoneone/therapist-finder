@@ -161,3 +161,40 @@ export function downloadFile(content, filename, mimeType = 'text/plain') {
 export async function healthCheck() {
     return request('/health');
 }
+
+/**
+ * Record that this browser opened a mail draft for the given therapist.
+ * @param {string} email
+ * @param {string} browserId
+ * @returns {Promise<{recorded: boolean}>}
+ */
+export async function recordContact(email, browserId) {
+    return request('/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, browser_id: browserId }),
+    });
+}
+
+/**
+ * Fetch global contact counts for a list of therapist emails.
+ * @param {string[]} emails
+ * @returns {Promise<{counts: Record<string, number>}>}
+ */
+export async function getContactCounts(emails) {
+    return request('/contacts/counts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emails }),
+    });
+}
+
+/**
+ * Fetch the emails this browser has already contacted.
+ * @param {string} browserId
+ * @returns {Promise<{emails: string[]}>}
+ */
+export async function getMyContacts(browserId) {
+    const qs = new URLSearchParams({ browser_id: browserId });
+    return request(`/contacts/mine?${qs}`);
+}
