@@ -210,3 +210,5 @@ pdf_therapist_parser.py
 therapist_processor.py
 install.sh
 requirements.txt
+.gitnexus
+.claude/
