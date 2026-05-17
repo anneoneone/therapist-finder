@@ -81,43 +81,18 @@ export async function parseFile(file) {
 }
 
 /**
- * Search for the N closest therapists to a Berlin address.
- * @param {Object} params
- * @param {string} params.address - Street address to search around
- * @param {number} [params.max_results=20] - Return the N closest providers
- * @param {string} [params.specialty='psychotherapie'] - Specialty slug (see listSpecialties)
- * @param {number} [params.radius_km=15]
- * @param {string[]} [params.sources] - Source names (defaults to server-side CI-safe set)
- * @returns {Promise<Object>} - Search response with ranked therapists
+ * Fetch a PDF from a psych-info.de URL and parse it server-side.
+ * @param {string} url - https://psych-info.de/... PDF URL
+ * @returns {Promise<Object>} - Parse response with therapists, total, with_email
  */
-export async function searchByAddress({
-    address,
-    max_results = 20,
-    specialty = 'psychotherapie',
-    radius_km = 15,
-    sources,
-}) {
-    return request('/therapists/search-by-address', {
+export async function parseUrl(url) {
+    return request('/therapists/parse-url', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            address,
-            max_results,
-            specialty,
-            radius_km,
-            ...(sources ? { sources } : {}),
-        }),
+        body: JSON.stringify({ url }),
     });
-}
-
-/**
- * Fetch the catalog of selectable specialties (for the search dropdown).
- * @returns {Promise<{specialties: Array<{key: string, label: string}>, default: string}>}
- */
-export async function listSpecialties() {
-    return request('/therapists/specialties');
 }
 
 /**

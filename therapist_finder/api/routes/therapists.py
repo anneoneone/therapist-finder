@@ -1,27 +1,20 @@
-"""Therapist parsing + address-search endpoints."""
+"""Therapist parsing endpoints."""
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+import httpx
 
 from ...config import Settings
 from ...models import TherapistData
-from ...parsers.arztsuche_api import Arztsuche116117Source
 from ...parsers.pdf_parser import PDFParser
 from ...parsers.text_parser import TextParser
 from ...sources import specialties
-from ...sources.base import SearchParams
-from ...sources.geocode import Geocoder, GeocodingError
-from ...sources.merger import merge_and_rank
-from ...sources.overpass import OverpassSource
-from ...sources.psych_info import PsychInfoSource
-from ...sources.therapie_de import TherapieDeSource
 from ..schemas import (
     ParseResponse,
-    SearchByAddressRequest,
-    SearchByAddressResponse,
+    ParseUrlRequest,
     SpecialtiesResponse,
     SpecialtyOption,
     TherapistResponse,
@@ -29,27 +22,7 @@ from ..schemas import (
 
 router = APIRouter(prefix="/therapists", tags=["therapists"])
 
-
-def _build_source(name: str, settings: Settings) -> object | None:
-    """Instantiate a source by name. Returns None for unknown names."""
-    if name == "116117":
-        return Arztsuche116117Source()
-    if name == "osm":
-        return OverpassSource(
-            endpoint=settings.overpass_endpoint,
-            user_agent=settings.scraper_user_agent,
-        )
-    if name == "psych_info":
-        return PsychInfoSource(
-            user_agent=settings.scraper_user_agent,
-            min_delay_seconds=settings.scraper_min_delay_seconds,
-        )
-    if name == "therapie_de":
-        return TherapieDeSource(
-            user_agent=settings.scraper_user_agent,
-            min_delay_seconds=max(settings.scraper_min_delay_seconds, 3.0),
-        )
-    return None
+_ALLOWED_PARSE_URL_HOSTS = {"psych-info.de", "www.psych-info.de"}
 
 
 def _therapist_to_response(t: TherapistData) -> TherapistResponse:
@@ -67,107 +40,6 @@ def _therapist_to_response(t: TherapistData) -> TherapistResponse:
         specialty_label=label,
         distance_km=t.distance_km,
         sources=list(t.sources),
-    )
-
-
-@router.post("/search-by-address", response_model=SearchByAddressResponse)
-async def search_by_address(
-    request: SearchByAddressRequest,
-) -> SearchByAddressResponse:
-    """Return the N closest providers to a street address.
-
-    Geocodes the input address, queries every enabled source in parallel,
-    merges duplicates across sources, and ranks by haversine distance.
-    """
-    settings = Settings()
-    requested = request.sources or settings.enabled_sources
-
-    geocoder = Geocoder(
-        endpoint=settings.geocoder_endpoint,
-        user_agent=settings.scraper_user_agent,
-        cache_dir=settings.http_cache_dir,
-    )
-    try:
-        origin = geocoder.geocode(request.address)
-    except GeocodingError as e:
-        geocoder.close()
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:  # noqa: BLE001
-        geocoder.close()
-        raise HTTPException(status_code=502, detail=f"Geocoding failed: {e}") from e
-
-    spec = specialties.resolve(request.specialty)
-    params = SearchParams(
-        specialty=spec.key,
-        lat=origin.lat,
-        lon=origin.lon,
-        radius_km=request.radius_km,
-        limit_per_source=max(request.max_results * 3, 50),
-    )
-
-    sources = [s for s in (_build_source(n, settings) for n in requested) if s]
-    if not sources:
-        geocoder.close()
-        raise HTTPException(status_code=400, detail="No valid sources selected")
-
-    results: dict[str, list[TherapistData]] = {}
-    with ThreadPoolExecutor(max_workers=len(sources)) as pool:
-        futures = {
-            pool.submit(src.search, params): src.name  # type: ignore[attr-defined]
-            for src in sources
-        }
-        for fut in as_completed(futures):
-            name = futures[fut]
-            try:
-                results[name] = fut.result()
-            except Exception:  # noqa: BLE001
-                results[name] = []
-
-    for src in sources:
-        src.close()  # type: ignore[attr-defined]
-
-    # Tag every hit with its inferred normalized specialty before we
-    # filter, so the post-filter can lean on a single stable field rather
-    # than re-running regexes per-source.
-    tagged: dict[str, list[TherapistData]] = {}
-    for src_name, entries in results.items():
-        tagged[src_name] = [
-            (
-                e.model_copy(update={"specialty": specialties.infer_key(e)})
-                if e.specialty is None
-                else e
-            )
-            for e in entries
-        ]
-
-    merged = merge_and_rank(
-        tagged,
-        origin.lat,
-        origin.lon,
-        # Over-fetch so the post-filter has room to drop non-matching hits
-        # without starving the response.
-        (
-            request.max_results * 4
-            if not specialties.is_all(spec)
-            else request.max_results
-        ),
-        geocoder=geocoder,
-    )
-    geocoder.close()
-
-    merged = specialties.filter_results(spec, merged)[: request.max_results]
-
-    responses = [_therapist_to_response(t) for t in merged]
-    with_email = sum(1 for t in merged if t.email)
-    return SearchByAddressResponse(
-        therapists=responses,
-        total=len(responses),
-        with_email=with_email,
-        origin_address=origin.display_name,
-        origin_lat=origin.lat,
-        origin_lon=origin.lon,
-        specialty=spec.key,
-        specialty_label=spec.label,
     )
 
 
@@ -246,4 +118,71 @@ async def parse_file(
     finally:
         # Clean up temp file
         if tmp_path.exists():
+            tmp_path.unlink()
+
+
+@router.post("/parse-url", response_model=ParseResponse)
+async def parse_url(request: ParseUrlRequest) -> ParseResponse:
+    """Download a PDF from a psych-info.de URL and parse it.
+
+    The host allowlist is narrow on purpose — the parser only understands
+    Psych-Info Resultate PDFs for now. Loosen the allowlist once we support
+    more remote layouts.
+    """
+    parsed = urlparse(str(request.url))
+    if parsed.scheme != "https":
+        raise HTTPException(
+            status_code=400,
+            detail="URL must use https://",
+        )
+    if (parsed.hostname or "").lower() not in _ALLOWED_PARSE_URL_HOSTS:
+        raise HTTPException(
+            status_code=400,
+            detail="Only psych-info.de URLs are accepted",
+        )
+
+    tmp_path: Path | None = None
+    try:
+        try:
+            with httpx.Client(timeout=30.0, follow_redirects=True) as client:
+                response = client.get(str(request.url))
+                response.raise_for_status()
+        except httpx.HTTPError as e:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to download PDF: {e}",
+            ) from e
+
+        content_type = response.headers.get("content-type", "").lower()
+        url_path = parsed.path.lower()
+        looks_like_pdf = content_type.startswith(
+            "application/pdf"
+        ) or url_path.endswith(".pdf")
+        if not looks_like_pdf:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Upstream did not return a PDF (content-type={content_type!r})",
+            )
+
+        with NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            tmp.write(response.content)
+            tmp_path = Path(tmp.name)
+
+        try:
+            therapists = PDFParser(Settings()).parse_file(tmp_path)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to parse PDF: {e}",
+            ) from e
+
+        therapist_responses = [_therapist_to_response(t) for t in therapists]
+        with_email = sum(1 for t in therapists if t.email)
+        return ParseResponse(
+            therapists=therapist_responses,
+            total=len(therapists),
+            with_email=with_email,
+        )
+    finally:
+        if tmp_path is not None and tmp_path.exists():
             tmp_path.unlink()

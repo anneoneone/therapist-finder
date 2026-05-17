@@ -102,7 +102,18 @@ class BaseParser(ABC):
         self.current_section = ""
 
     def parse_text_content(self, text: str) -> list[TherapistData]:
-        """Parse extracted text content into structured data."""
+        """Parse extracted text content into structured data.
+
+        Dispatches to the right strategy based on a content marker. The
+        Psych-Info Resultate format has no profession header or field labels
+        so the KV Berlin state machine produces zero entries for it.
+        """
+        if "Psych-Info Resultate" in text:
+            return self._parse_psych_info(text)
+        return self._parse_kv_berlin(text)
+
+    def _parse_kv_berlin(self, text: str) -> list[TherapistData]:
+        """Parse KV-Berlin-style PDFs (profession headers + `Tel.:` / `E-Mail:`)."""
         lines = text.split("\n")
         data: list[TherapistData] = []
 
@@ -177,5 +188,85 @@ class BaseParser(ABC):
 
         # Don't forget the last entry
         self._finalize_entry(data)
+
+        return data
+
+    _PSYCH_INFO_ENTRY_MARKER = re.compile(r"^\s*\d+\s*\.\s*$")
+    _PSYCH_INFO_DISTANCE_LINE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*km\s*$")
+    _PSYCH_INFO_EMAIL = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+")
+    _PSYCH_INFO_PHONE_SHAPE = re.compile(r"^[\d\s\-/()\.+]+$")
+
+    def _parse_psych_info(self, text: str) -> list[TherapistData]:
+        """Parse Psych-Info Resultate PDFs.
+
+        Entries are introduced by a numbered marker line (``1 .``, ``2 .`` …),
+        optionally preceded by a distance line (``0.05 km``). Each block has
+        name, address, and a free mix of phone / email / Sprechzeiten lines
+        which are classified by content.
+        """
+        lines = [line.strip() for line in text.split("\n")]
+        data: list[TherapistData] = []
+
+        # Locate every entry-marker index along with its captured distance.
+        markers: list[tuple[int, float | None]] = []
+        for idx, line in enumerate(lines):
+            if not self._PSYCH_INFO_ENTRY_MARKER.match(line):
+                continue
+            distance: float | None = None
+            for back in range(idx - 1, -1, -1):
+                if not lines[back]:
+                    continue
+                m = self._PSYCH_INFO_DISTANCE_LINE.match(lines[back])
+                if m:
+                    distance = float(m.group(1))
+                break
+            markers.append((idx, distance))
+
+        for i, (start, distance) in enumerate(markers):
+            end = markers[i + 1][0] if i + 1 < len(markers) else len(lines)
+            # Skip the preceding distance line (if any) so it doesn't land in
+            # the next block when we slice.
+            block_end = end
+            if i + 1 < len(markers):
+                prev = end - 1
+                while prev > start and not lines[prev]:
+                    prev -= 1
+                if self._PSYCH_INFO_DISTANCE_LINE.match(lines[prev]):
+                    block_end = prev
+
+            block = [ln for ln in lines[start + 1 : block_end] if ln]
+            if len(block) < 2:
+                continue
+
+            self.current_entry = {
+                "name": block[0],
+                "address": block[1],
+                "sources": ["psych_info"],
+            }
+            if distance is not None:
+                self.current_entry["distance_km"] = distance
+
+            sprechzeiten: list[str] = []
+            for line in block[2:]:
+                email_match = self._PSYCH_INFO_EMAIL.search(line)
+                if email_match:
+                    email = email_match.group(0)
+                    if email in self.seen_emails:
+                        self.current_entry["duplicate_email"] = True
+                    else:
+                        self.current_entry["email"] = email
+                    continue
+                if (
+                    self._PSYCH_INFO_PHONE_SHAPE.match(line)
+                    and sum(c.isdigit() for c in line) >= 6
+                ):
+                    self.current_entry["telefon"] = line
+                    continue
+                sprechzeiten.append(line)
+
+            if sprechzeiten:
+                self.current_entry["sprechzeiten"] = sprechzeiten
+
+            self._finalize_entry(data)
 
         return data
