@@ -27,7 +27,7 @@ import {
 // Constants
 // ============================================
 
-const STATE_STORAGE_KEY = 'therapist-finder:state';
+const STATE_STORAGE_KEY = 'therapist-finder:state:v2';
 const CONTACTED_STORAGE_KEY = 'therapist-finder:contacted-emails';
 const BROWSER_ID_STORAGE_KEY = 'therapist-finder:browser-id';
 const MAILTO_MAX_LENGTH = 1900;
@@ -130,6 +130,9 @@ const elements = {
     viewTemplate: $('view-template'),
     templateForm: $('template-form'),
     templateBody: $('template-body'),
+    templateGreetingReadonly: $('template-greeting-readonly'),
+    templateBasicInfoReadonly: $('template-basic-info-readonly'),
+    templateClosingReadonly: $('template-closing-readonly'),
     templateContinue: $('template-continue'),
     templateStatus: $('template-status'),
     templatePreviewTarget: $('template-preview-target'),
@@ -465,6 +468,7 @@ function hydrateUserInfoForm() {
     form.insurance.value = ui.insurance || '';
     form.email.value = ui.email || '';
     form.phone.value = ui.phone || '';
+    form.vermittlungscode.value = ui.vermittlungscode || '';
 }
 
 function handleUserInfoSubmit(event) {
@@ -479,6 +483,7 @@ function handleUserInfoSubmit(event) {
         insurance: formData.get('insurance') || null,
         email: formData.get('email') || null,
         phone: formData.get('phone') || null,
+        vermittlungscode: formData.get('vermittlungscode') || null,
     };
     // Editing user info invalidates previously generated drafts.
     state.results = null;
@@ -511,6 +516,74 @@ function generateSalutation(name) {
     return `Sehr geehrte/r ${title} ${lastName}`.replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Build the readonly contact-info block. Lines for missing fields are
+ * omitted so the recipient never sees an empty "Tel.: " line. Placeholders
+ * (`{name}`, `{telefon}`, ...) are preserved here; the backend substitutes
+ * them at draft-render time.
+ */
+function buildBasicInfoBlockTemplate(userInfo) {
+    const lines = ['Meine Kontaktdaten:', '{name}'];
+    if (userInfo.phone) lines.push('Tel.: {telefon}');
+    if (userInfo.email) lines.push('E-Mail: {email}');
+    if (userInfo.vermittlungscode) lines.push('Vermittlungscode: {vermittlungscode}');
+    return lines.join('\n');
+}
+
+const TEMPLATE_GREETING = '<ANREDE>,';
+const TEMPLATE_CLOSING = 'Mit besten Grüßen\n{name}';
+
+/**
+ * Compose the full template body that's sent to the backend: readonly
+ * greeting + user-typed body + readonly contact info + readonly closing.
+ * Placeholders remain in place; the backend handles substitution.
+ */
+function assembleTemplateBody(userInfo, body) {
+    return [
+        TEMPLATE_GREETING,
+        '',
+        body,
+        '',
+        buildBasicInfoBlockTemplate(userInfo),
+        '',
+        TEMPLATE_CLOSING,
+    ].join('\n');
+}
+
+/**
+ * Mirror server-side placeholder substitution for previewing what the
+ * recipient will see. `<ANREDE>` is per-therapist; the rest come from
+ * step-3 user info.
+ */
+function renderTemplateWithSubstitutions(text, userInfo, salutation) {
+    const fullName = `${userInfo.first_name || ''} ${userInfo.last_name || ''}`.trim();
+    return text
+        .replace(/<ANREDE>/g, salutation)
+        .replace(/\{name\}/g, fullName)
+        .replace(/\{address\}/g, '')
+        .replace(/\{telefon\}/g, userInfo.phone || '')
+        .replace(/\{email\}/g, userInfo.email || '')
+        .replace(/\{vermittlungscode\}/g, userInfo.vermittlungscode || '');
+}
+
+function renderReadonlySections() {
+    const ui = state.userInfo || {};
+    const therapist = state.therapists.find((t) => !!t.email) || state.therapists[0];
+    const salutation = therapist
+        ? (therapist.salutation || generateSalutation(therapist.name))
+        : 'Sehr geehrte/r';
+
+    elements.templateGreetingReadonly.textContent = renderTemplateWithSubstitutions(
+        TEMPLATE_GREETING, ui, salutation
+    );
+    elements.templateBasicInfoReadonly.textContent = renderTemplateWithSubstitutions(
+        buildBasicInfoBlockTemplate(ui), ui, salutation
+    );
+    elements.templateClosingReadonly.textContent = renderTemplateWithSubstitutions(
+        TEMPLATE_CLOSING, ui, salutation
+    );
+}
+
 function renderTemplatePreview() {
     const body = elements.templateBody.value || '';
     const therapist = state.therapists.find((t) => !!t.email) || state.therapists[0];
@@ -523,39 +596,34 @@ function renderTemplatePreview() {
 
     const ui = state.userInfo || {};
     const salutation = therapist.salutation || generateSalutation(therapist.name);
-
-    let rendered = body.replace(/<ANREDE>/g, salutation);
-    // Mirror server-side str.format replacement for the small set of fields used.
-    const fullName = `${ui.first_name || ''} ${ui.last_name || ''}`.trim();
-    rendered = rendered
-        .replace(/\{name\}/g, fullName)
-        .replace(/\{address\}/g, '')
-        .replace(/\{telefon\}/g, ui.phone || '')
-        .replace(/\{email\}/g, ui.email || '')
-        .replace(/\{vermittlungscode\}/g, '');
+    const assembled = assembleTemplateBody(ui, body);
+    const rendered = renderTemplateWithSubstitutions(assembled, ui, salutation);
 
     elements.templatePreviewTarget.textContent = t('step4.previewTarget', { name: therapist.name });
     elements.templatePreviewBody.textContent = rendered;
 }
 
 async function initTemplateView() {
+    // Default body is empty; the backend's on-disk template is no longer the
+    // source of the message text — only the user's typed body fills the
+    // middle. We still call getTemplate() once to honour any non-empty
+    // override an admin may have set on disk.
+    if (state.templateBody === undefined || state.templateBody === null) {
+        state.templateBody = '';
+    }
     if (!state.templateBody) {
-        showStatus(elements.templateStatus, t('step4.statusLoadingTemplate'), 'info');
         try {
             const result = await getTemplate();
             state.templateBody = result.body || '';
             persistState();
-            hideStatus(elements.templateStatus);
         } catch (error) {
             console.error('Load template error:', error);
-            showStatus(
-                elements.templateStatus,
-                error instanceof APIError ? error.message : t('step4.statusLoadTemplateFailed'),
-                'error'
-            );
+            // Non-fatal: fall back to an empty body.
+            state.templateBody = '';
         }
     }
     elements.templateBody.value = state.templateBody;
+    renderReadonlySections();
     renderTemplatePreview();
 }
 
@@ -571,7 +639,8 @@ async function handleTemplateSubmit(event) {
     showStatus(elements.templateStatus, t('step4.statusGenerating'), 'info');
 
     try {
-        const result = await generateEmails(state.therapists, state.userInfo, body);
+        const assembled = assembleTemplateBody(state.userInfo || {}, body);
+        const result = await generateEmails(state.therapists, state.userInfo, assembled);
         state.results = result;
         // Reset queue position on fresh generation.
         state.queue = { items: [], index: 0 };

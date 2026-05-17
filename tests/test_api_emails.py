@@ -15,7 +15,6 @@ def test_get_template_returns_body() -> None:
     body = resp.json()
     assert "body" in body
     assert isinstance(body["body"], str)
-    assert body["body"].strip() != ""
 
 
 def test_generate_uses_custom_template_body() -> None:
@@ -46,8 +45,8 @@ def test_generate_uses_custom_template_body() -> None:
     assert "Sehr geehrte Frau Dr. Mustermann" in draft["body"]
 
 
-def test_generate_without_template_body_uses_default() -> None:
-    """Omitting template_body falls back to the on-disk template (no error)."""
+def test_generate_substitutes_user_placeholders() -> None:
+    """Curly-brace placeholders in template_body are filled from user_info."""
     client = TestClient(app)
     payload = {
         "therapists": [
@@ -57,11 +56,25 @@ def test_generate_without_template_body_uses_default() -> None:
                 "salutation": "Sehr geehrte Frau Dr. Mustermann",
             }
         ],
-        "user_info": {"first_name": "Anton", "last_name": "Kress"},
+        "user_info": {
+            "first_name": "Anton",
+            "last_name": "Kress",
+            "phone": "0177 123456",
+            "email": "anton@example.com",
+            "vermittlungscode": "ABC-123",
+        },
+        "template_body": (
+            "<ANREDE>,\n\nMy custom body.\n\n"
+            "Meine Kontaktdaten:\n{name}\nTel.: {telefon}\n"
+            "E-Mail: {email}\nVermittlungscode: {vermittlungscode}\n\n"
+            "Mit besten Grüßen\n{name}"
+        ),
     }
     resp = client.post("/api/emails/generate", json=payload)
     assert resp.status_code == 200, resp.text
-    data = resp.json()
-    assert len(data["drafts"]) == 1
-    # Default template should not contain our custom marker.
-    assert "XYZ123" not in data["drafts"][0]["body"]
+    body = resp.json()["drafts"][0]["body"]
+    assert "Anton Kress" in body
+    assert "0177 123456" in body
+    assert "anton@example.com" in body
+    assert "ABC-123" in body
+    assert "Sehr geehrte Frau Dr. Mustermann" in body
