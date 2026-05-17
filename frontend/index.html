@@ -19,78 +19,134 @@
             </div>
         </header>
 
+        <nav class="stepper" aria-label="Steps">
+            <div class="container">
+                <ol class="stepper-list">
+                    <li class="stepper-item" data-step="url">
+                        <a href="#/url"><span class="stepper-num">1</span><span class="stepper-label">PDF URL</span></a>
+                    </li>
+                    <li class="stepper-item" data-step="overview">
+                        <a href="#/overview"><span class="stepper-num">2</span><span class="stepper-label">Overview</span></a>
+                    </li>
+                    <li class="stepper-item" data-step="me">
+                        <a href="#/me"><span class="stepper-num">3</span><span class="stepper-label">My info</span></a>
+                    </li>
+                    <li class="stepper-item" data-step="template">
+                        <a href="#/template"><span class="stepper-num">4</span><span class="stepper-label">Mail body</span></a>
+                    </li>
+                    <li class="stepper-item" data-step="send">
+                        <a href="#/send"><span class="stepper-num">5</span><span class="stepper-label">Send</span></a>
+                    </li>
+                </ol>
+            </div>
+        </nav>
+
         <main class="main container">
-            <!-- Step 1: Load therapists from a Psych-Info Resultate PDF URL -->
-            <section class="card" id="search-section">
+            <!-- View 1: paste PDF URL (with upload fallback) -->
+            <section class="view card" id="view-url">
                 <div class="card-header">
                     <span class="step-badge">1</span>
                     <h2>Load therapists from a PDF</h2>
                 </div>
                 <div class="card-body">
-                    <form id="search-form" class="form">
-                        <div class="form-group">
-                            <label for="search-pdf-url">Psych-Info PDF URL *</label>
-                            <input
-                                type="url"
-                                id="search-pdf-url"
-                                name="pdf_url"
-                                inputmode="url"
-                                placeholder="https://psych-info.de/wp-content/uploads/pdf/psych-info_resultate_…pdf"
-                                required>
-                            <p class="dropzone-hint">
-                                Paste the link to a Psych-Info "Resultate" PDF.
-                                We'll fetch and parse it on the server, then
-                                show the ranked list of therapists below.
-                            </p>
+                    <div id="search-section">
+                        <form id="search-form" class="form">
+                            <div class="form-group">
+                                <label for="search-pdf-url">Psych-Info PDF URL *</label>
+                                <input
+                                    type="url"
+                                    id="search-pdf-url"
+                                    name="pdf_url"
+                                    inputmode="url"
+                                    placeholder="https://psych-info.de/wp-content/uploads/pdf/psych-info_resultate_…pdf"
+                                    required>
+                                <p class="dropzone-hint">
+                                    Paste the link to a Psych-Info "Resultate" PDF.
+                                    We'll fetch and parse it on the server, then
+                                    show the ranked list of therapists in the next step.
+                                </p>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-lg" id="search-btn">
+                                <span class="btn-text">Load list</span>
+                                <span class="btn-loader" hidden></span>
+                            </button>
+                        </form>
+                        <div class="status" id="search-status" hidden></div>
+                        <p class="dropzone-hint">
+                            Have a local file?
+                            <a href="#" id="toggle-upload">Upload a PDF / text file instead</a>.
+                        </p>
+                    </div>
+
+                    <div id="upload-section" hidden>
+                        <div class="dropzone" id="dropzone">
+                            <input type="file" id="file-input" accept=".pdf,.txt" hidden>
+                            <div class="dropzone-content">
+                                <span class="dropzone-icon">📄</span>
+                                <p class="dropzone-text">Drag &amp; drop your PDF or text file here</p>
+                                <p class="dropzone-hint">or click to browse</p>
+                            </div>
+                            <div class="dropzone-file" id="selected-file" hidden>
+                                <span class="file-icon">📎</span>
+                                <span class="file-name" id="file-name"></span>
+                                <button class="btn-icon" id="remove-file" title="Remove file">✕</button>
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-lg" id="search-btn">
-                            <span class="btn-text">Load list</span>
+                        <button class="btn btn-primary btn-lg" id="upload-btn" disabled>
+                            <span class="btn-text">Parse File</span>
                             <span class="btn-loader" hidden></span>
                         </button>
-                    </form>
-                    <div class="status" id="search-status" hidden></div>
-                    <p class="dropzone-hint">
-                        Have a local file?
-                        <a href="#" id="toggle-upload">Upload a PDF / text file instead</a>.
-                    </p>
-                </div>
-            </section>
-
-            <!-- Legacy: Upload PDF/TXT (hidden by default, toggled on demand) -->
-            <section class="card" id="upload-section" hidden>
-                <div class="card-header">
-                    <span class="step-badge">1</span>
-                    <h2>Upload Therapist List</h2>
-                </div>
-                <div class="card-body">
-                    <div class="dropzone" id="dropzone">
-                        <input type="file" id="file-input" accept=".pdf,.txt" hidden>
-                        <div class="dropzone-content">
-                            <span class="dropzone-icon">📄</span>
-                            <p class="dropzone-text">Drag & drop your PDF or text file here</p>
-                            <p class="dropzone-hint">or click to browse</p>
-                        </div>
-                        <div class="dropzone-file" id="selected-file" hidden>
-                            <span class="file-icon">📎</span>
-                            <span class="file-name" id="file-name"></span>
-                            <button class="btn-icon" id="remove-file" title="Remove file">✕</button>
-                        </div>
+                        <div class="status" id="upload-status" hidden></div>
+                        <p class="dropzone-hint">
+                            <a href="#" id="toggle-search">← Back to URL input</a>
+                        </p>
                     </div>
-                    <button class="btn btn-primary btn-lg" id="upload-btn" disabled>
-                        <span class="btn-text">Parse File</span>
-                        <span class="btn-loader" hidden></span>
-                    </button>
-                    <div class="status" id="upload-status" hidden></div>
-                    <p class="dropzone-hint">
-                        <a href="#" id="toggle-search">← Back to URL input</a>
-                    </p>
                 </div>
             </section>
 
-            <!-- Step 2: User Info -->
-            <section class="card" id="userinfo-section" hidden>
+            <!-- View 2: overview of parsed results (collapsed) -->
+            <section class="view card" id="view-overview">
                 <div class="card-header">
                     <span class="step-badge">2</span>
+                    <h2>Overview</h2>
+                    <div class="card-actions">
+                        <button class="btn btn-secondary" id="download-table" type="button">
+                            📊 Download Table
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="results-summary" id="results-summary"></div>
+                    <details class="overview-details" id="overview-details">
+                        <summary>Show full therapist list</summary>
+                        <div class="table-container">
+                            <table class="table" id="therapists-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Specialty</th>
+                                        <th>Email</th>
+                                        <th>Phone</th>
+                                        <th>Address</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="therapists-tbody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    <div class="view-actions">
+                        <a href="#/url" class="btn btn-secondary">← Back</a>
+                        <a href="#/me" class="btn btn-primary">Continue →</a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View 3: my information -->
+            <section class="view card" id="view-me">
+                <div class="card-header">
+                    <span class="step-badge">3</span>
                     <h2>Your Information</h2>
                 </div>
                 <div class="card-body">
@@ -125,62 +181,69 @@
                                 <input type="tel" id="phone" name="phone">
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-lg">
-                            <span class="btn-text">Generate Emails</span>
-                            <span class="btn-loader" hidden></span>
-                        </button>
+                        <div class="view-actions">
+                            <a href="#/overview" class="btn btn-secondary">← Back</a>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <span class="btn-text">Continue →</span>
+                                <span class="btn-loader" hidden></span>
+                            </button>
+                        </div>
                     </form>
                     <div class="status" id="generate-status" hidden></div>
                 </div>
             </section>
 
-            <!-- Step 3: Results -->
-            <section class="card" id="results-section" hidden>
+            <!-- View 4: mail template body (editable, with preview) -->
+            <section class="view card" id="view-template">
                 <div class="card-header">
-                    <span class="step-badge">3</span>
-                    <h2>Results</h2>
-                    <div class="card-actions">
-                        <button class="btn btn-secondary" id="download-table">
-                            📊 Download Table
-                        </button>
-                        <button class="btn btn-primary" id="open-queue">
-                            📬 Open Email Drafts
-                        </button>
-                    </div>
+                    <span class="step-badge">4</span>
+                    <h2>Mail Template</h2>
                 </div>
                 <div class="card-body">
-                    <div class="results-summary" id="results-summary"></div>
-                    <div class="table-container">
-                        <table class="table" id="therapists-table">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Specialty</th>
-                                    <th>Email</th>
-                                    <th>Phone</th>
-                                    <th>Address</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="therapists-tbody">
-                            </tbody>
-                        </table>
-                    </div>
+                    <form id="template-form" class="form">
+                        <div class="form-group">
+                            <label for="template-body">Email body</label>
+                            <textarea
+                                id="template-body"
+                                name="template_body"
+                                rows="14"
+                                class="template-editor"
+                                required></textarea>
+                            <p class="dropzone-hint">
+                                Use <code>&lt;ANREDE&gt;</code> as the salutation placeholder.
+                                Curly-brace placeholders like <code>{name}</code>, <code>{telefon}</code>,
+                                <code>{email}</code>, <code>{vermittlungscode}</code> are replaced with your info.
+                            </p>
+                        </div>
+                        <div class="template-preview">
+                            <div class="template-preview-header">
+                                <span>Live preview</span>
+                                <span class="template-preview-target" id="template-preview-target"></span>
+                            </div>
+                            <pre id="template-preview-body" class="template-preview-body"></pre>
+                        </div>
+                        <div class="status" id="template-status" hidden></div>
+                        <div class="view-actions">
+                            <a href="#/me" class="btn btn-secondary">← Back</a>
+                            <button type="submit" class="btn btn-primary btn-lg" id="template-continue">
+                                <span class="btn-text">Generate &amp; continue →</span>
+                                <span class="btn-loader" hidden></span>
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </section>
-        </main>
 
-        <!-- Email draft queue modal -->
-        <div class="queue-overlay" id="queue-overlay" hidden>
-            <div class="queue-modal" role="dialog" aria-modal="true" aria-labelledby="queue-title">
-                <header class="queue-header">
-                    <h3 id="queue-title">
+            <!-- View 5: send mails -->
+            <section class="view card" id="view-send">
+                <div class="card-header">
+                    <span class="step-badge">5</span>
+                    <h2>
                         Contact therapist
                         <span id="queue-position">1</span> of <span id="queue-total">1</span>
-                    </h3>
-                    <button class="btn-icon" id="queue-close" title="Close" aria-label="Close">✕</button>
-                </header>
-                <div class="queue-body">
+                    </h2>
+                </div>
+                <div class="card-body">
                     <div class="queue-therapist" id="queue-therapist"></div>
                     <div class="queue-preview">
                         <div class="queue-preview-row">
@@ -197,15 +260,16 @@
                         Use <strong>Copy body</strong> to paste the full text into the compose window.
                     </div>
                     <div class="status" id="queue-status" hidden></div>
+                    <div class="view-actions queue-actions">
+                        <a href="#/template" class="btn btn-secondary">← Back</a>
+                        <button class="btn btn-secondary" id="queue-copy-body" type="button">📋 Copy body</button>
+                        <button class="btn btn-secondary" id="queue-skip" type="button">Skip</button>
+                        <button class="btn btn-primary" id="queue-open" type="button">📧 Open in mail app</button>
+                        <button class="btn btn-primary" id="queue-next" type="button" disabled>Next →</button>
+                    </div>
                 </div>
-                <footer class="queue-actions">
-                    <button class="btn btn-secondary" id="queue-copy-body">📋 Copy body</button>
-                    <button class="btn btn-secondary" id="queue-skip">Skip</button>
-                    <button class="btn btn-primary" id="queue-open">📧 Open in mail app</button>
-                    <button class="btn btn-primary" id="queue-next" disabled>Next →</button>
-                </footer>
-            </div>
-        </div>
+            </section>
+        </main>
 
         <footer class="footer">
             <div class="container">

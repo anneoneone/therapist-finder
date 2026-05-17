@@ -79,6 +79,13 @@ class GenerateRequest(BaseModel):
 
     therapists: list[TherapistResponse]
     user_info: UserInfoRequest
+    template_body: str | None = Field(
+        None,
+        description=(
+            "Optional template body override. If unset, the server-side "
+            "default template is loaded from disk."
+        ),
+    )
 
 
 class GenerateResponse(BaseModel):
@@ -86,6 +93,12 @@ class GenerateResponse(BaseModel):
 
     drafts: list[EmailDraftResponse]
     table_csv: str
+
+
+class TemplateResponse(BaseModel):
+    """Response from GET /emails/template."""
+
+    body: str
 
 
 class HealthResponse(BaseModel):

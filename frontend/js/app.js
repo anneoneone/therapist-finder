@@ -1,5 +1,5 @@
 /**
- * Therapist Finder - Main Application
+ * Therapist Finder - Multi-step hash-routed flow.
  * @module app
  */
 
@@ -7,127 +7,144 @@ import {
     APIError,
     downloadFile,
     generateEmails,
+    getTemplate,
     parseFile,
     parseUrl,
 } from './api.js';
 
 // ============================================
-// State
+// Constants
 // ============================================
 
-const state = {
-    file: null,
-    therapists: [],
-    userInfo: {},
-    results: null,
-    queue: { items: [], index: 0 },
-};
-
+const STATE_STORAGE_KEY = 'therapist-finder:state';
 const CONTACTED_STORAGE_KEY = 'therapist-finder:contacted-emails';
 const MAILTO_MAX_LENGTH = 1900;
 const TRUNCATION_MARKER = '\n\n[… truncated — use "Copy body" to paste full text]';
+
+const STEPS = ['url', 'overview', 'me', 'template', 'send'];
+
+// ============================================
+// State (persisted to sessionStorage, except `file`)
+// ============================================
+
+const defaultState = () => ({
+    pdfUrl: '',
+    therapists: [],
+    userInfo: {},
+    templateBody: '',
+    results: null,
+    queue: { items: [], index: 0 },
+});
+
+const state = (() => {
+    try {
+        const raw = sessionStorage.getItem(STATE_STORAGE_KEY);
+        if (!raw) return defaultState();
+        return { ...defaultState(), ...JSON.parse(raw) };
+    } catch {
+        return defaultState();
+    }
+})();
+
+// `file` is not persistable across refresh; keep it in memory only.
+let selectedFile = null;
+
+function persistState() {
+    try {
+        sessionStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {
+        console.warn('Failed to persist state:', error);
+    }
+}
 
 // ============================================
 // DOM Elements
 // ============================================
 
+const $ = (id) => document.getElementById(id);
+
 const elements = {
-    // PDF URL section (default)
-    searchSection: document.getElementById('search-section'),
-    searchForm: document.getElementById('search-form'),
-    searchBtn: document.getElementById('search-btn'),
-    searchStatus: document.getElementById('search-status'),
-    searchPdfUrl: document.getElementById('search-pdf-url'),
-    toggleUpload: document.getElementById('toggle-upload'),
-    toggleSearch: document.getElementById('toggle-search'),
+    // Step 1
+    viewUrl: $('view-url'),
+    searchSection: $('search-section'),
+    searchForm: $('search-form'),
+    searchBtn: $('search-btn'),
+    searchStatus: $('search-status'),
+    searchPdfUrl: $('search-pdf-url'),
+    toggleUpload: $('toggle-upload'),
+    toggleSearch: $('toggle-search'),
+    uploadSection: $('upload-section'),
+    dropzone: $('dropzone'),
+    fileInput: $('file-input'),
+    selectedFile: $('selected-file'),
+    fileName: $('file-name'),
+    removeFile: $('remove-file'),
+    uploadBtn: $('upload-btn'),
+    uploadStatus: $('upload-status'),
 
-    // Upload section (legacy fallback)
-    uploadSection: document.getElementById('upload-section'),
-    dropzone: document.getElementById('dropzone'),
-    fileInput: document.getElementById('file-input'),
-    selectedFile: document.getElementById('selected-file'),
-    fileName: document.getElementById('file-name'),
-    removeFile: document.getElementById('remove-file'),
-    uploadBtn: document.getElementById('upload-btn'),
-    uploadStatus: document.getElementById('upload-status'),
+    // Step 2
+    viewOverview: $('view-overview'),
+    resultsSummary: $('results-summary'),
+    therapistsTbody: $('therapists-tbody'),
+    downloadTable: $('download-table'),
 
-    // User info section
-    userinfoSection: document.getElementById('userinfo-section'),
-    userinfoForm: document.getElementById('userinfo-form'),
-    generateStatus: document.getElementById('generate-status'),
+    // Step 3
+    viewMe: $('view-me'),
+    userinfoForm: $('userinfo-form'),
+    generateStatus: $('generate-status'),
 
-    // Results section
-    resultsSection: document.getElementById('results-section'),
-    resultsSummary: document.getElementById('results-summary'),
-    therapistsTbody: document.getElementById('therapists-tbody'),
-    downloadTable: document.getElementById('download-table'),
-    openQueue: document.getElementById('open-queue'),
+    // Step 4
+    viewTemplate: $('view-template'),
+    templateForm: $('template-form'),
+    templateBody: $('template-body'),
+    templateContinue: $('template-continue'),
+    templateStatus: $('template-status'),
+    templatePreviewTarget: $('template-preview-target'),
+    templatePreviewBody: $('template-preview-body'),
 
-    // Queue modal
-    queueOverlay: document.getElementById('queue-overlay'),
-    queueClose: document.getElementById('queue-close'),
-    queuePosition: document.getElementById('queue-position'),
-    queueTotal: document.getElementById('queue-total'),
-    queueTherapist: document.getElementById('queue-therapist'),
-    queueSubject: document.getElementById('queue-subject'),
-    queueBodyPreview: document.getElementById('queue-body-preview'),
-    queueTruncationWarning: document.getElementById('queue-truncation-warning'),
-    queueStatus: document.getElementById('queue-status'),
-    queueCopyBody: document.getElementById('queue-copy-body'),
-    queueSkip: document.getElementById('queue-skip'),
-    queueOpen: document.getElementById('queue-open'),
-    queueNext: document.getElementById('queue-next'),
+    // Step 5
+    viewSend: $('view-send'),
+    queuePosition: $('queue-position'),
+    queueTotal: $('queue-total'),
+    queueTherapist: $('queue-therapist'),
+    queueSubject: $('queue-subject'),
+    queueBodyPreview: $('queue-body-preview'),
+    queueTruncationWarning: $('queue-truncation-warning'),
+    queueStatus: $('queue-status'),
+    queueCopyBody: $('queue-copy-body'),
+    queueSkip: $('queue-skip'),
+    queueOpen: $('queue-open'),
+    queueNext: $('queue-next'),
+
+    // Stepper
+    stepperItems: document.querySelectorAll('.stepper-item'),
+    views: document.querySelectorAll('.view'),
 };
 
 // ============================================
 // Utility Functions
 // ============================================
 
-/**
- * Show a status message.
- * @param {HTMLElement} element - Status element
- * @param {string} message - Message to display
- * @param {'success'|'error'|'info'|'warning'} type - Message type
- */
 function showStatus(element, message, type = 'info') {
+    if (!element) return;
     element.textContent = message;
     element.className = `status ${type}`;
     element.hidden = false;
 }
 
-/**
- * Hide a status message.
- * @param {HTMLElement} element - Status element
- */
 function hideStatus(element) {
-    element.hidden = true;
+    if (element) element.hidden = true;
 }
 
-/**
- * Set loading state on a button.
- * @param {HTMLButtonElement} button - Button element
- * @param {boolean} loading - Loading state
- */
 function setButtonLoading(button, loading) {
+    if (!button) return;
     const text = button.querySelector('.btn-text');
     const loader = button.querySelector('.btn-loader');
-
-    if (loading) {
-        button.disabled = true;
-        if (text) text.hidden = true;
-        if (loader) loader.hidden = false;
-    } else {
-        button.disabled = false;
-        if (text) text.hidden = false;
-        if (loader) loader.hidden = true;
-    }
+    button.disabled = loading;
+    if (text) text.hidden = loading;
+    if (loader) loader.hidden = !loading;
 }
 
-/**
- * Escape HTML to prevent XSS.
- * @param {string} text - Raw text
- * @returns {string} - Escaped HTML
- */
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
@@ -135,57 +152,133 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// ============================================
+// Router
+// ============================================
+
 /**
- * Format a date string for display.
- * @param {string} dateStr - Date string
- * @returns {string} - Formatted date
+ * Return the earliest step whose prerequisites are unmet, given current state.
+ * Used both to guard direct deep-links and to compute stepper "completed" state.
  */
-function formatDate(dateStr) {
-    if (!dateStr) return '-';
-    return dateStr;
+function firstUnsatisfiedStep() {
+    if (state.therapists.length === 0) return 'url';
+    if (!state.userInfo.first_name) return 'me';
+    if (!state.templateBody) return 'template';
+    if (!state.results || !state.results.drafts) return 'template';
+    return null; // all satisfied
+}
+
+function canEnterStep(step) {
+    switch (step) {
+        case 'url':
+            return true;
+        case 'overview':
+        case 'me':
+            return state.therapists.length > 0;
+        case 'template':
+            return state.therapists.length > 0 && !!state.userInfo.first_name;
+        case 'send':
+            return !!(state.results && state.results.drafts && state.results.drafts.length);
+        default:
+            return false;
+    }
+}
+
+function currentStep() {
+    const hash = window.location.hash.replace(/^#\//, '');
+    return STEPS.includes(hash) ? hash : 'url';
+}
+
+function navigate(step) {
+    const target = STEPS.includes(step) ? step : 'url';
+    if (window.location.hash !== `#/${target}`) {
+        window.location.hash = `#/${target}`;
+    } else {
+        renderRoute();
+    }
+}
+
+function renderRoute() {
+    let step = currentStep();
+    if (!canEnterStep(step)) {
+        step = firstUnsatisfiedStep() || 'url';
+        if (window.location.hash !== `#/${step}`) {
+            window.location.hash = `#/${step}`;
+            return; // hashchange will re-trigger renderRoute
+        }
+    }
+
+    elements.views.forEach((view) => {
+        view.classList.toggle('active', view.id === `view-${step}`);
+    });
+
+    const stepIndex = STEPS.indexOf(step);
+    elements.stepperItems.forEach((item) => {
+        const itemStep = item.dataset.step;
+        const itemIndex = STEPS.indexOf(itemStep);
+        item.classList.toggle('active', itemStep === step);
+        item.classList.toggle('completed', itemIndex < stepIndex && canEnterStep(itemStep));
+        item.classList.toggle('disabled', !canEnterStep(itemStep));
+    });
+
+    onEnterStep(step);
+}
+
+function onEnterStep(step) {
+    switch (step) {
+        case 'url':
+            if (state.pdfUrl) elements.searchPdfUrl.value = state.pdfUrl;
+            break;
+        case 'overview':
+            renderTherapists();
+            break;
+        case 'me':
+            hydrateUserInfoForm();
+            break;
+        case 'template':
+            initTemplateView();
+            break;
+        case 'send':
+            initSendView();
+            break;
+    }
 }
 
 // ============================================
-// PDF URL (default flow)
+// Step 1: PDF URL + upload fallback
 // ============================================
 
-/**
- * Handle the "Load list" form submission.
- * Sends a psych-info.de PDF URL to the backend, which downloads and parses
- * it, then populates the same state that the file-upload path fills so the
- * downstream render + email-draft queue just work.
- * @param {Event} event - Form submit event
- */
+function setEntrySection(target) {
+    const showSearch = target === 'search';
+    elements.searchSection.hidden = !showSearch;
+    elements.uploadSection.hidden = showSearch;
+}
+
 async function handlePdfUrlSubmit(event) {
     event.preventDefault();
     const url = elements.searchPdfUrl.value.trim();
     if (!url) return;
 
     setButtonLoading(elements.searchBtn, true);
-    showStatus(
-        elements.searchStatus,
-        'Fetching and parsing PDF…',
-        'info'
-    );
+    showStatus(elements.searchStatus, 'Fetching and parsing PDF…', 'info');
 
     try {
         const result = await parseUrl(url);
+        state.pdfUrl = url;
         state.therapists = result.therapists || [];
         state.results = null;
+        persistState();
 
         const total = state.therapists.length;
         const withEmail = state.therapists.filter((t) => t.email).length;
         showStatus(
             elements.searchStatus,
             `✓ ${total} therapist${total === 1 ? '' : 's'} parsed `
-                + `(${withEmail} with email; only those can receive a mailto draft)`,
+                + `(${withEmail} with email)`,
             'success'
         );
 
-        renderTherapists();
-        elements.resultsSection.hidden = false;
-        elements.userinfoSection.hidden = false;
-        elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
+        navigate('overview');
     } catch (error) {
         console.error('Parse URL error:', error);
         showStatus(
@@ -200,32 +293,12 @@ async function handlePdfUrlSubmit(event) {
     }
 }
 
-/**
- * Swap between the PDF-URL and file-upload sections.
- * @param {'search' | 'upload'} target
- */
-function setEntrySection(target) {
-    const showSearch = target === 'search';
-    elements.searchSection.hidden = !showSearch;
-    elements.uploadSection.hidden = showSearch;
-}
-
-// ============================================
-// File Handling
-// ============================================
-
-/**
- * Handle file selection.
- * @param {File} file - Selected file
- */
 function handleFileSelect(file) {
     if (!file) return;
-
-    // Validate file type
     const validTypes = ['application/pdf', 'text/plain'];
     const validExtensions = ['.pdf', '.txt'];
     const hasValidType = validTypes.includes(file.type);
-    const hasValidExtension = validExtensions.some(ext =>
+    const hasValidExtension = validExtensions.some((ext) =>
         file.name.toLowerCase().endsWith(ext)
     );
 
@@ -234,7 +307,7 @@ function handleFileSelect(file) {
         return;
     }
 
-    state.file = file;
+    selectedFile = file;
     elements.fileName.textContent = file.name;
     elements.selectedFile.hidden = false;
     elements.dropzone.querySelector('.dropzone-content').hidden = true;
@@ -242,11 +315,8 @@ function handleFileSelect(file) {
     hideStatus(elements.uploadStatus);
 }
 
-/**
- * Remove selected file.
- */
 function handleFileRemove() {
-    state.file = null;
+    selectedFile = null;
     elements.fileInput.value = '';
     elements.selectedFile.hidden = true;
     elements.dropzone.querySelector('.dropzone-content').hidden = false;
@@ -254,40 +324,29 @@ function handleFileRemove() {
     hideStatus(elements.uploadStatus);
 }
 
-// ============================================
-// Upload & Parse
-// ============================================
-
-/**
- * Upload and parse the selected file.
- */
 async function handleUpload() {
-    if (!state.file) return;
+    if (!selectedFile) return;
 
     setButtonLoading(elements.uploadBtn, true);
     showStatus(elements.uploadStatus, 'Parsing file...', 'info');
 
     try {
-        const result = await parseFile(state.file);
+        const result = await parseFile(selectedFile);
         state.therapists = result.therapists || result;
+        state.pdfUrl = '';
         state.results = null;
+        persistState();
 
         const total = state.therapists.length;
         const withEmail = state.therapists.filter((t) => t.email).length;
-
         showStatus(
             elements.uploadStatus,
             `✓ ${withEmail} contactable therapist${withEmail === 1 ? '' : 's'} `
-                + `(of ${total} parsed; only those with an email can receive a `
-                + `mailto draft)`,
+                + `(of ${total} parsed)`,
             'success'
         );
 
-        renderTherapists();
-        elements.resultsSection.hidden = false;
-        elements.userinfoSection.hidden = false;
-        elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
-
+        navigate('overview');
     } catch (error) {
         console.error('Upload error:', error);
         showStatus(
@@ -303,78 +362,12 @@ async function handleUpload() {
 }
 
 // ============================================
-// Email Generation
+// Step 2: Overview
 // ============================================
 
-/**
- * Handle user info form submission.
- * @param {Event} event - Form submit event
- */
-async function handleGenerateEmails(event) {
-    event.preventDefault();
-
-    const form = event.target;
-    const formData = new FormData(form);
-    const submitBtn = form.querySelector('button[type="submit"]');
-
-    // Collect user info
-    state.userInfo = {
-        first_name: formData.get('first_name'),
-        last_name: formData.get('last_name'),
-        birth_date: formData.get('birth_date') || null,
-        insurance: formData.get('insurance') || null,
-        email: formData.get('email') || null,
-        phone: formData.get('phone') || null,
-    };
-
-    setButtonLoading(submitBtn, true);
-    showStatus(elements.generateStatus, 'Generating emails...', 'info');
-
-    try {
-        const result = await generateEmails(state.therapists, state.userInfo);
-        state.results = result;
-
-        showStatus(elements.generateStatus, '✓ Emails generated successfully!', 'success');
-
-        // Show results section
-        displayResults();
-        elements.resultsSection.hidden = false;
-        elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
-
-    } catch (error) {
-        console.error('Generation error:', error);
-        showStatus(
-            elements.generateStatus,
-            error instanceof APIError
-                ? error.message
-                : 'Failed to generate emails. Please try again.',
-            'error'
-        );
-    } finally {
-        setButtonLoading(submitBtn, false);
-    }
-}
-
-// ============================================
-// Results Display
-// ============================================
-
-/**
- * Render the therapist list into the results table.
- * Safe to call after an address search (no drafts yet) or after email
- * generation (drafts populated) — the summary adapts to what's available.
- */
 function renderTherapists() {
     const { therapists } = state;
-    const drafts = state.results?.drafts;
     const contactable = therapists.filter((t) => !!t.email).length;
-
-    const contactableLabel = drafts
-        ? `${drafts.length}`
-        : `${contactable}`;
-    const contactableHeader = drafts
-        ? 'Emails Generated'
-        : 'Contactable (have email)';
 
     elements.resultsSummary.innerHTML = `
         <div class="summary-item">
@@ -382,8 +375,8 @@ function renderTherapists() {
             <div class="summary-label">Total Therapists</div>
         </div>
         <div class="summary-item">
-            <div class="summary-value">${contactableLabel}</div>
-            <div class="summary-label">${contactableHeader}</div>
+            <div class="summary-value">${contactable}</div>
+            <div class="summary-label">Contactable (have email)</div>
         </div>
     `;
 
@@ -407,59 +400,179 @@ function renderTherapists() {
         .join('');
 }
 
-/**
- * Update the results after email generation so the summary shows drafts.
- */
-function displayResults() {
-    renderTherapists();
-}
-
-// ============================================
-// Downloads
-// ============================================
-
-/**
- * Download therapist table as CSV.
- */
 function handleDownloadTable() {
-    // Use server-generated CSV if available
     const { table_csv = '' } = state.results || {};
-
     let csvContent;
     if (table_csv) {
         csvContent = table_csv;
     } else {
-        // Fallback: generate client-side
         const { therapists } = state;
         const headers = ['Name', 'Specialty', 'Email', 'Phone', 'Address'];
-        const rows = therapists.map(t => [
+        const rows = therapists.map((t) => [
             t.name || '',
             t.specialty_label || t.specialty || '',
             t.email || '',
             t.phone || '',
             t.address || '',
         ]);
-
         csvContent = [
             headers.join(','),
-            ...rows.map(row =>
-                row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')
+            ...rows.map((row) =>
+                row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(',')
             ),
         ].join('\n');
     }
-
     const filename = `therapists_${new Date().toISOString().split('T')[0]}.csv`;
     downloadFile(csvContent, filename, 'text/csv');
 }
 
 // ============================================
-// Email Draft Queue
+// Step 3: My info
+// ============================================
+
+function hydrateUserInfoForm() {
+    const ui = state.userInfo || {};
+    const form = elements.userinfoForm;
+    if (!form) return;
+    form.first_name.value = ui.first_name || '';
+    form.last_name.value = ui.last_name || '';
+    form.birth_date.value = ui.birth_date || '';
+    form.insurance.value = ui.insurance || '';
+    form.email.value = ui.email || '';
+    form.phone.value = ui.phone || '';
+}
+
+function handleUserInfoSubmit(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+
+    state.userInfo = {
+        first_name: formData.get('first_name'),
+        last_name: formData.get('last_name'),
+        birth_date: formData.get('birth_date') || null,
+        insurance: formData.get('insurance') || null,
+        email: formData.get('email') || null,
+        phone: formData.get('phone') || null,
+    };
+    // Editing user info invalidates previously generated drafts.
+    state.results = null;
+    persistState();
+
+    navigate('template');
+}
+
+// ============================================
+// Step 4: Mail template body
 // ============================================
 
 /**
- * Load the set of previously-contacted email addresses from localStorage.
- * @returns {Set<string>}
+ * Client-side mirror of EmailGenerator._generate_salutation in
+ * therapist_finder/email/generator.py — preview only; the backend still
+ * generates the real drafts.
  */
+function generateSalutation(name) {
+    if (!name) return 'Sehr geehrte/r';
+    const titleMatch = name.match(/(Dr\.|Dipl\.-Psych\.)/);
+    const title = titleMatch ? titleMatch[0] : '';
+    const parts = name.trim().split(/\s+/);
+    const lastName = parts[parts.length - 1] || '';
+    if (name.includes('Frau')) {
+        return `Sehr geehrte Frau ${title} ${lastName}`.replace(/\s+/g, ' ').trim();
+    }
+    if (name.includes('Herr')) {
+        return `Sehr geehrter Herr ${title} ${lastName}`.replace(/\s+/g, ' ').trim();
+    }
+    return `Sehr geehrte/r ${title} ${lastName}`.replace(/\s+/g, ' ').trim();
+}
+
+function renderTemplatePreview() {
+    const body = elements.templateBody.value || '';
+    const therapist = state.therapists.find((t) => !!t.email) || state.therapists[0];
+
+    if (!therapist) {
+        elements.templatePreviewTarget.textContent = '';
+        elements.templatePreviewBody.textContent = '(No therapist to preview against.)';
+        return;
+    }
+
+    const ui = state.userInfo || {};
+    const salutation = therapist.salutation || generateSalutation(therapist.name);
+
+    let rendered = body.replace(/<ANREDE>/g, salutation);
+    // Mirror server-side str.format replacement for the small set of fields used.
+    const fullName = `${ui.first_name || ''} ${ui.last_name || ''}`.trim();
+    rendered = rendered
+        .replace(/\{name\}/g, fullName)
+        .replace(/\{address\}/g, '')
+        .replace(/\{telefon\}/g, ui.phone || '')
+        .replace(/\{email\}/g, ui.email || '')
+        .replace(/\{vermittlungscode\}/g, '');
+
+    elements.templatePreviewTarget.textContent = `for: ${therapist.name}`;
+    elements.templatePreviewBody.textContent = rendered;
+}
+
+async function initTemplateView() {
+    if (!state.templateBody) {
+        showStatus(elements.templateStatus, 'Loading default template…', 'info');
+        try {
+            const result = await getTemplate();
+            state.templateBody = result.body || '';
+            persistState();
+            hideStatus(elements.templateStatus);
+        } catch (error) {
+            console.error('Load template error:', error);
+            showStatus(
+                elements.templateStatus,
+                error instanceof APIError
+                    ? error.message
+                    : 'Failed to load default template.',
+                'error'
+            );
+        }
+    }
+    elements.templateBody.value = state.templateBody;
+    renderTemplatePreview();
+}
+
+async function handleTemplateSubmit(event) {
+    event.preventDefault();
+    const body = elements.templateBody.value;
+    if (!body.trim()) return;
+
+    state.templateBody = body;
+    persistState();
+
+    setButtonLoading(elements.templateContinue, true);
+    showStatus(elements.templateStatus, 'Generating emails…', 'info');
+
+    try {
+        const result = await generateEmails(state.therapists, state.userInfo, body);
+        state.results = result;
+        // Reset queue position on fresh generation.
+        state.queue = { items: [], index: 0 };
+        persistState();
+        hideStatus(elements.templateStatus);
+        navigate('send');
+    } catch (error) {
+        console.error('Generation error:', error);
+        showStatus(
+            elements.templateStatus,
+            error instanceof APIError
+                ? error.message
+                : 'Failed to generate emails. Please try again.',
+            'error'
+        );
+    } finally {
+        setButtonLoading(elements.templateContinue, false);
+    }
+}
+
+// ============================================
+// Step 5: Send mails (queue)
+// ============================================
+
 function loadContactedEmails() {
     try {
         const raw = localStorage.getItem(CONTACTED_STORAGE_KEY);
@@ -472,10 +585,6 @@ function loadContactedEmails() {
     }
 }
 
-/**
- * Persist the set of contacted email addresses.
- * @param {Set<string>} set
- */
 function saveContactedEmails(set) {
     try {
         localStorage.setItem(CONTACTED_STORAGE_KEY, JSON.stringify([...set]));
@@ -484,10 +593,6 @@ function saveContactedEmails(set) {
     }
 }
 
-/**
- * Mark a single email address as contacted.
- * @param {string} email
- */
 function markEmailContacted(email) {
     if (!email) return;
     const set = loadContactedEmails();
@@ -495,11 +600,6 @@ function markEmailContacted(email) {
     saveContactedEmails(set);
 }
 
-/**
- * Build a mailto: URL, truncating the body if needed to stay within URL limits.
- * @param {{to: string, subject: string, body: string}} draft
- * @returns {{url: string, truncated: boolean}}
- */
 function buildMailtoUrl({ to, subject, body }) {
     const encodedTo = encodeURIComponent(to || '');
     const encodedSubject = encodeURIComponent(subject || '');
@@ -513,18 +613,13 @@ function buildMailtoUrl({ to, subject, body }) {
     if (encodedBody.length > budget) {
         truncated = true;
         const markerLength = encodeURIComponent(TRUNCATION_MARKER).length;
-        // Binary-search for the largest prefix of body whose encoded length
-        // plus the encoded truncation marker fits into the budget.
         let low = 0;
         let high = bodyToEncode.length;
         while (low < high) {
             const mid = Math.ceil((low + high) / 2);
             const candidate = encodeURIComponent(bodyToEncode.slice(0, mid)).length;
-            if (candidate + markerLength <= budget) {
-                low = mid;
-            } else {
-                high = mid - 1;
-            }
+            if (candidate + markerLength <= budget) low = mid;
+            else high = mid - 1;
         }
         bodyToEncode = bodyToEncode.slice(0, low) + TRUNCATION_MARKER;
         encodedBody = encodeURIComponent(bodyToEncode);
@@ -536,51 +631,62 @@ function buildMailtoUrl({ to, subject, body }) {
     };
 }
 
-/**
- * Get the current draft in the queue, or null.
- * @returns {object|null}
- */
 function currentQueueDraft() {
     const { items, index } = state.queue;
     return items[index] || null;
 }
 
-/**
- * Open the queue modal, populating it with uncontacted drafts.
- */
-function openQueue() {
+function initSendView() {
     const drafts = (state.results && state.results.drafts) || [];
     if (drafts.length === 0) {
-        showStatus(elements.generateStatus, 'No drafts available. Generate emails first.', 'warning');
-        return;
-    }
-
-    const contacted = loadContactedEmails();
-    const items = drafts.filter(d => d.to && !contacted.has(d.to.toLowerCase()));
-
-    if (items.length === 0) {
         showStatus(
-            elements.generateStatus,
-            'All therapists from this list were already contacted. Clear your browser storage to start over.',
-            'info'
+            elements.queueStatus,
+            'No drafts available. Go back and generate emails first.',
+            'warning'
         );
         return;
     }
 
-    state.queue = { items, index: 0 };
-    elements.queueOverlay.hidden = false;
-    hideStatus(elements.queueStatus);
+    // Build the queue once per session unless drafts changed length.
+    const needsRebuild =
+        !state.queue ||
+        !Array.isArray(state.queue.items) ||
+        state.queue.items.length === 0 ||
+        state.queue.index >= state.queue.items.length;
+
+    if (needsRebuild) {
+        const contacted = loadContactedEmails();
+        const items = drafts.filter((d) => d.to && !contacted.has(d.to.toLowerCase()));
+        state.queue = { items, index: 0 };
+        persistState();
+    }
+
+    if (state.queue.items.length === 0) {
+        showStatus(
+            elements.queueStatus,
+            'All therapists from this list were already contacted. Clear your browser storage to start over.',
+            'info'
+        );
+        elements.queueTherapist.innerHTML = '';
+        elements.queueSubject.textContent = '';
+        elements.queueBodyPreview.textContent = '';
+        elements.queueOpen.disabled = true;
+        elements.queueNext.disabled = true;
+        return;
+    }
+
     renderQueueItem();
 }
 
-/**
- * Render the current queue item into the modal.
- */
 function renderQueueItem() {
     const draft = currentQueueDraft();
     if (!draft) {
-        closeQueue();
-        showStatus(elements.generateStatus, '✓ Queue complete.', 'success');
+        showStatus(elements.queueStatus, '✓ Queue complete.', 'success');
+        elements.queueTherapist.innerHTML = '';
+        elements.queueSubject.textContent = '';
+        elements.queueBodyPreview.textContent = '';
+        elements.queueOpen.disabled = true;
+        elements.queueNext.disabled = true;
         return;
     }
 
@@ -603,16 +709,11 @@ function renderQueueItem() {
     hideStatus(elements.queueStatus);
 }
 
-/**
- * Trigger the mailto: URL and mark the current email as contacted.
- */
 function handleQueueOpen() {
     const draft = currentQueueDraft();
     if (!draft) return;
-
     const { url } = buildMailtoUrl(draft);
 
-    // Use an anchor click for best cross-browser reliability with mailto:.
     const link = document.createElement('a');
     link.href = url;
     link.rel = 'noopener';
@@ -630,41 +731,21 @@ function handleQueueOpen() {
     );
 }
 
-/**
- * Advance to the next queue item.
- */
 function handleQueueNext() {
     state.queue.index += 1;
+    persistState();
     renderQueueItem();
 }
 
-/**
- * Skip the current therapist without marking them as contacted.
- */
 function handleQueueSkip() {
     state.queue.index += 1;
+    persistState();
     renderQueueItem();
 }
 
-/**
- * Close the queue modal.
- */
-function closeQueue() {
-    elements.queueOverlay.hidden = true;
-    state.queue = { items: [], index: 0 };
-}
-
-function handleQueueClose() {
-    closeQueue();
-}
-
-/**
- * Copy the current draft's body to the clipboard.
- */
 async function handleQueueCopyBody() {
     const draft = currentQueueDraft();
     if (!draft) return;
-
     try {
         await navigator.clipboard.writeText(draft.body || '');
         showStatus(elements.queueStatus, '✓ Email body copied to clipboard.', 'success');
@@ -683,7 +764,7 @@ async function handleQueueCopyBody() {
 // ============================================
 
 function initEventListeners() {
-    // PDF URL (default flow)
+    // Step 1
     elements.searchForm.addEventListener('submit', handlePdfUrlSubmit);
     elements.toggleUpload.addEventListener('click', (e) => {
         e.preventDefault();
@@ -694,70 +775,68 @@ function initEventListeners() {
         setEntrySection('search');
     });
 
-    // Dropzone click
     elements.dropzone.addEventListener('click', (e) => {
         if (e.target !== elements.removeFile && !elements.removeFile.contains(e.target)) {
             elements.fileInput.click();
         }
     });
-
-    // File input change
     elements.fileInput.addEventListener('change', (e) => {
         handleFileSelect(e.target.files[0]);
     });
-
-    // Drag and drop
     elements.dropzone.addEventListener('dragover', (e) => {
         e.preventDefault();
         elements.dropzone.classList.add('dragover');
     });
-
     elements.dropzone.addEventListener('dragleave', () => {
         elements.dropzone.classList.remove('dragover');
     });
-
     elements.dropzone.addEventListener('drop', (e) => {
         e.preventDefault();
         elements.dropzone.classList.remove('dragover');
         const file = e.dataTransfer.files[0];
         handleFileSelect(file);
     });
-
-    // Remove file
     elements.removeFile.addEventListener('click', (e) => {
         e.stopPropagation();
         handleFileRemove();
     });
-
-    // Upload button
     elements.uploadBtn.addEventListener('click', handleUpload);
 
-    // User info form
-    elements.userinfoForm.addEventListener('submit', handleGenerateEmails);
-
-    // Download / queue buttons
+    // Step 2
     elements.downloadTable.addEventListener('click', handleDownloadTable);
-    elements.openQueue.addEventListener('click', openQueue);
 
-    // Queue modal
-    elements.queueClose.addEventListener('click', handleQueueClose);
+    // Step 3
+    elements.userinfoForm.addEventListener('submit', handleUserInfoSubmit);
+
+    // Step 4
+    elements.templateForm.addEventListener('submit', handleTemplateSubmit);
+    elements.templateBody.addEventListener('input', () => {
+        state.templateBody = elements.templateBody.value;
+        renderTemplatePreview();
+    });
+
+    // Step 5
     elements.queueOpen.addEventListener('click', handleQueueOpen);
     elements.queueNext.addEventListener('click', handleQueueNext);
     elements.queueSkip.addEventListener('click', handleQueueSkip);
     elements.queueCopyBody.addEventListener('click', handleQueueCopyBody);
-    elements.queueOverlay.addEventListener('click', (e) => {
-        if (e.target === elements.queueOverlay) handleQueueClose();
-    });
+
+    // Router
+    window.addEventListener('hashchange', renderRoute);
 }
 
 // ============================================
-// Initialize
+// Init
 // ============================================
 
 function init() {
     initEventListeners();
+    if (!window.location.hash) {
+        window.location.hash = '#/url';
+    } else {
+        renderRoute();
+    }
     console.log('Therapist Finder initialized');
 }
 
-// Start the app
 init();
