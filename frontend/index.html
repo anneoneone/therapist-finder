@@ -20,83 +20,37 @@
         </header>
 
         <main class="main container">
-            <!-- Step 1: Find nearby therapists by address (default flow) -->
+            <!-- Step 1: Load therapists from a Psych-Info Resultate PDF URL -->
             <section class="card" id="search-section">
                 <div class="card-header">
                     <span class="step-badge">1</span>
-                    <h2>Find therapists near you</h2>
+                    <h2>Load therapists from a PDF</h2>
                 </div>
                 <div class="card-body">
                     <form id="search-form" class="form">
                         <div class="form-group">
-                            <label for="search-address">Address *</label>
+                            <label for="search-pdf-url">Psych-Info PDF URL *</label>
                             <input
-                                type="text"
-                                id="search-address"
-                                name="address"
-                                placeholder="e.g. Kastanienallee 12, 10435 Berlin"
-                                autocomplete="street-address"
+                                type="url"
+                                id="search-pdf-url"
+                                name="pdf_url"
+                                inputmode="url"
+                                placeholder="https://psych-info.de/wp-content/uploads/pdf/psych-info_resultate_…pdf"
                                 required>
                             <p class="dropzone-hint">
-                                We'll return the N closest providers of the
-                                chosen specialty, sorted by distance to this
-                                address.
+                                Paste the link to a Psych-Info "Resultate" PDF.
+                                We'll fetch and parse it on the server, then
+                                show the ranked list of therapists below.
                             </p>
                         </div>
-                        <div class="form-group">
-                            <label for="search-specialty">Doctor kind</label>
-                            <select id="search-specialty" name="specialty">
-                                <!-- Options are populated from
-                                     /api/therapists/specialties on load;
-                                     the fallback list below ships with the
-                                     static site so the form still works
-                                     before the API replies. -->
-                                <option value="psychotherapie" selected>Psychotherapie</option>
-                                <option value="kinder_jugend_psychotherapie">Kinder- &amp; Jugendpsychotherapie</option>
-                                <option value="psychiatrie">Psychiatrie</option>
-                                <option value="kinderarzt">Kinder- &amp; Jugendmedizin</option>
-                                <option value="allgemeinmedizin">Allgemeinmedizin / Hausarzt</option>
-                                <option value="hno">HNO (Hals-Nasen-Ohren)</option>
-                                <option value="gynaekologie">Gynäkologie</option>
-                                <option value="dermatologie">Dermatologie (Haut)</option>
-                                <option value="augenarzt">Augenheilkunde</option>
-                                <option value="orthopaedie">Orthopädie</option>
-                                <option value="zahnarzt">Zahnarzt</option>
-                                <option value="heilpraktiker">Heilpraktiker:in (Psychotherapie)</option>
-                                <option value="all">Alle Ärzte &amp; Therapeut:innen</option>
-                            </select>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="search-max">How many results</label>
-                                <input
-                                    type="number"
-                                    id="search-max"
-                                    name="max_results"
-                                    min="1"
-                                    max="100"
-                                    value="20">
-                            </div>
-                            <div class="form-group">
-                                <label for="search-radius">Radius (km)</label>
-                                <input
-                                    type="number"
-                                    id="search-radius"
-                                    name="radius_km"
-                                    min="1"
-                                    max="50"
-                                    step="0.5"
-                                    value="15">
-                            </div>
-                        </div>
                         <button type="submit" class="btn btn-primary btn-lg" id="search-btn">
-                            <span class="btn-text">Find therapists</span>
+                            <span class="btn-text">Load list</span>
                             <span class="btn-loader" hidden></span>
                         </button>
                     </form>
                     <div class="status" id="search-status" hidden></div>
                     <p class="dropzone-hint">
-                        Got a list already?
+                        Have a local file?
                         <a href="#" id="toggle-upload">Upload a PDF / text file instead</a>.
                     </p>
                 </div>
@@ -128,7 +82,7 @@
                     </button>
                     <div class="status" id="upload-status" hidden></div>
                     <p class="dropzone-hint">
-                        <a href="#" id="toggle-search">← Back to address search</a>
+                        <a href="#" id="toggle-search">← Back to URL input</a>
                     </p>
                 </div>
             </section>

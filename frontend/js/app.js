@@ -7,9 +7,8 @@ import {
     APIError,
     downloadFile,
     generateEmails,
-    listSpecialties,
     parseFile,
-    searchByAddress,
+    parseUrl,
 } from './api.js';
 
 // ============================================
@@ -33,15 +32,12 @@ const TRUNCATION_MARKER = '\n\n[… truncated — use "Copy body" to paste full 
 // ============================================
 
 const elements = {
-    // Address search section (default)
+    // PDF URL section (default)
     searchSection: document.getElementById('search-section'),
     searchForm: document.getElementById('search-form'),
     searchBtn: document.getElementById('search-btn'),
     searchStatus: document.getElementById('search-status'),
-    searchAddress: document.getElementById('search-address'),
-    searchMax: document.getElementById('search-max'),
-    searchRadius: document.getElementById('search-radius'),
-    searchSpecialty: document.getElementById('search-specialty'),
+    searchPdfUrl: document.getElementById('search-pdf-url'),
     toggleUpload: document.getElementById('toggle-upload'),
     toggleSearch: document.getElementById('toggle-search'),
 
@@ -150,70 +146,53 @@ function formatDate(dateStr) {
 }
 
 // ============================================
-// Address search (default flow)
+// PDF URL (default flow)
 // ============================================
 
 /**
- * Handle the "Find therapists" form submission.
- * Calls the backend crawl pipeline with an address and populates the same
- * state that the PDF-upload path fills, so the downstream email-draft
- * queue just works.
+ * Handle the "Load list" form submission.
+ * Sends a psych-info.de PDF URL to the backend, which downloads and parses
+ * it, then populates the same state that the file-upload path fills so the
+ * downstream render + email-draft queue just work.
  * @param {Event} event - Form submit event
  */
-async function handleAddressSearch(event) {
+async function handlePdfUrlSubmit(event) {
     event.preventDefault();
-    const address = elements.searchAddress.value.trim();
-    if (!address) return;
-
-    const maxResults = Number(elements.searchMax.value) || 20;
-    const radiusKm = Number(elements.searchRadius.value) || 15;
-    const specialty = elements.searchSpecialty?.value || 'psychotherapie';
-    const specialtyLabel =
-        elements.searchSpecialty?.selectedOptions?.[0]?.textContent?.trim()
-        || specialty;
+    const url = elements.searchPdfUrl.value.trim();
+    if (!url) return;
 
     setButtonLoading(elements.searchBtn, true);
     showStatus(
         elements.searchStatus,
-        `Crawling public directories near ${address} for ${specialtyLabel}…`,
+        'Fetching and parsing PDF…',
         'info'
     );
 
     try {
-        const result = await searchByAddress({
-            address,
-            max_results: maxResults,
-            radius_km: radiusKm,
-            specialty,
-        });
+        const result = await parseUrl(url);
         state.therapists = result.therapists || [];
         state.results = null;
 
         const total = state.therapists.length;
         const withEmail = state.therapists.filter((t) => t.email).length;
-        const originLabel = result.origin_address || address;
-        const specLabel = result.specialty_label || specialtyLabel;
         showStatus(
             elements.searchStatus,
-            `✓ ${total} ${specLabel} provider${total === 1 ? '' : 's'} `
-                + `near ${originLabel} (${withEmail} with email; only those `
-                + `can receive a mailto draft)`,
+            `✓ ${total} therapist${total === 1 ? '' : 's'} parsed `
+                + `(${withEmail} with email; only those can receive a mailto draft)`,
             'success'
         );
 
-        // Render the ranked list right away so the user can see results
-        // before filling in personal info.
         renderTherapists();
         elements.resultsSection.hidden = false;
         elements.userinfoSection.hidden = false;
         elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
     } catch (error) {
-        console.error('Search error:', error);
+        console.error('Parse URL error:', error);
         showStatus(
             elements.searchStatus,
             error instanceof APIError
                 ? error.message
-                : 'Search failed. Please try again.',
+                : 'Failed to load PDF. Please check the URL and try again.',
             'error'
         );
     } finally {
@@ -222,7 +201,7 @@ async function handleAddressSearch(event) {
 }
 
 /**
- * Swap between the address-search and file-upload sections.
+ * Swap between the PDF-URL and file-upload sections.
  * @param {'search' | 'upload'} target
  */
 function setEntrySection(target) {
@@ -426,33 +405,6 @@ function renderTherapists() {
             `;
         })
         .join('');
-}
-
-/**
- * Populate the specialty dropdown from the backend catalog. Falls back
- * silently to the static options baked into index.html if the API is
- * unreachable (e.g. during local file:// testing).
- */
-async function loadSpecialtyOptions() {
-    const select = elements.searchSpecialty;
-    if (!select) return;
-    try {
-        const { specialties = [], default: defaultKey } = await listSpecialties();
-        if (!specialties.length) return;
-        const previous = select.value;
-        select.innerHTML = specialties
-            .map(
-                (s) =>
-                    `<option value="${escapeHtml(s.key)}">${escapeHtml(s.label)}</option>`,
-            )
-            .join('');
-        const desired = previous && specialties.some((s) => s.key === previous)
-            ? previous
-            : defaultKey;
-        if (desired) select.value = desired;
-    } catch (error) {
-        console.warn('Failed to load specialties, keeping static options:', error);
-    }
 }
 
 /**
@@ -731,8 +683,8 @@ async function handleQueueCopyBody() {
 // ============================================
 
 function initEventListeners() {
-    // Address search (default flow)
-    elements.searchForm.addEventListener('submit', handleAddressSearch);
+    // PDF URL (default flow)
+    elements.searchForm.addEventListener('submit', handlePdfUrlSubmit);
     elements.toggleUpload.addEventListener('click', (e) => {
         e.preventDefault();
         setEntrySection('upload');
@@ -804,7 +756,6 @@ function initEventListeners() {
 
 function init() {
     initEventListeners();
-    loadSpecialtyOptions();
     console.log('Therapist Finder initialized');
 }
 

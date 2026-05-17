@@ -1,6 +1,6 @@
 """API request and response schemas."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 
 
 class UserInfoRequest(BaseModel):
@@ -42,49 +42,13 @@ class ParseResponse(BaseModel):
     with_email: int
 
 
-class SearchByAddressRequest(BaseModel):
-    """Search by address: the webapp's default entry point."""
+class ParseUrlRequest(BaseModel):
+    """Request to fetch and parse a PDF from a remote URL."""
 
-    address: str = Field(
+    url: HttpUrl = Field(
         ...,
-        description=(
-            "Street address to search around, e.g. 'Kastanienallee 12, 10435 Berlin'"
-        ),
+        description="HTTPS URL pointing to a PDF hosted on psych-info.de",
     )
-    max_results: int = Field(
-        20, ge=1, le=100, description="Return the N closest providers"
-    )
-    specialty: str = Field(
-        "psychotherapie",
-        description=(
-            "Specialty filter. Accepts a slug from the /specialties registry "
-            "(e.g. 'psychotherapie', 'hno', 'all') or a legacy German label "
-            "like 'Psychotherapeut'."
-        ),
-    )
-    radius_km: float = Field(
-        15.0, ge=0.5, le=50.0, description="Per-source search radius"
-    )
-    sources: list[str] | None = Field(
-        None,
-        description=(
-            "Source names to query. Defaults to the CI-safe set configured "
-            "in Settings.enabled_sources when omitted."
-        ),
-    )
-
-
-class SearchByAddressResponse(BaseModel):
-    """Response to a search-by-address request."""
-
-    therapists: list[TherapistResponse]
-    total: int
-    with_email: int
-    origin_address: str
-    origin_lat: float
-    origin_lon: float
-    specialty: str | None = None
-    specialty_label: str | None = None
 
 
 class SpecialtyOption(BaseModel):
