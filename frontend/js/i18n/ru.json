@@ -21,6 +21,12 @@
   "common.continue": "Далее →",
 
   "step1.heading": "Загрузить терапевтов из PDF",
+  "step1.howToTitle": "Как получить URL PDF на Psych-Info",
+  "step1.howStep1": "Откройте <a href=\"https://psych-info.de/\" target=\"_blank\" rel=\"noopener noreferrer\">psych-info.de</a>",
+  "step1.howStep2": "Найдите терапевтов в нужном вам месте",
+  "step1.howStep3": "Сформируйте PDF (кнопка <strong>«Liste erstellen für Ausdruck»</strong>)",
+  "step1.howStep4": "Скопируйте URL открывшегося PDF (например, <code>https://psych-info.de/wp-content/uploads/pdf/psych-info_resultate_6a0ax0x0x0x0.pdf</code>)",
+  "step1.howStep5": "Вставьте URL в поле ниже",
   "step1.urlLabel": "URL PDF Psych-Info *",
   "step1.urlPlaceholder": "https://psych-info.de/wp-content/uploads/pdf/psych-info_resultate_…pdf",
   "step1.urlHint": "Вставьте ссылку на PDF «Resultate» сайта Psych-Info. Мы скачаем и обработаем его на сервере, а на следующем шаге покажем отсортированный список терапевтов.",

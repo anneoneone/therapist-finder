@@ -21,6 +21,12 @@
   "common.continue": "Continua →",
 
   "step1.heading": "Carica i terapeuti da un PDF",
+  "step1.howToTitle": "Come ottenere l’URL del PDF da Psych-Info",
+  "step1.howStep1": "Apri <a href=\"https://psych-info.de/\" target=\"_blank\" rel=\"noopener noreferrer\">psych-info.de</a>",
+  "step1.howStep2": "Cerca terapeuti nella località che preferisci",
+  "step1.howStep3": "Genera il PDF (pulsante <strong>«Liste erstellen für Ausdruck»</strong>)",
+  "step1.howStep4": "Copia l’URL del PDF aperto (es. <code>https://psych-info.de/wp-content/uploads/pdf/psych-info_resultate_6a0ax0x0x0x0.pdf</code>)",
+  "step1.howStep5": "Incolla l’URL nel campo qui sotto",
   "step1.urlLabel": "URL del PDF di Psych-Info *",
   "step1.urlPlaceholder": "https://psych-info.de/wp-content/uploads/pdf/psych-info_resultate_…pdf",
   "step1.urlHint": "Incolla il link a un PDF «Resultate» di Psych-Info. Lo scarichiamo e lo analizziamo sul server, poi mostriamo l'elenco ordinato dei terapeuti nel passaggio successivo.",
