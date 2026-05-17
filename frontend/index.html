@@ -198,6 +198,12 @@
                                 <input type="tel" id="phone" name="phone">
                             </div>
                         </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="vermittlungscode" data-i18n="step3.vermittlungscode">Vermittlungscode</label>
+                                <input type="text" id="vermittlungscode" name="vermittlungscode" data-i18n-placeholder="step3.vermittlungscodePlaceholder" placeholder="e.g., BYK9-YMDS-5FRY">
+                            </div>
+                        </div>
                         <div class="view-actions">
                             <a href="#/overview" class="btn btn-secondary" data-i18n="common.back">← Back</a>
                             <button type="submit" class="btn btn-primary btn-lg">
@@ -210,30 +216,39 @@
                 </div>
             </section>
 
-            <!-- View 4: mail template body (editable, with preview) -->
+            <!-- View 4: mail body (editable), wrapped by readonly greeting/contact-info/closing -->
             <section class="view card" id="view-template">
                 <div class="card-header">
                     <span class="step-badge">4</span>
-                    <h2 data-i18n="step4.heading">Mail template</h2>
+                    <h2 data-i18n="step4.heading">Mail body</h2>
                 </div>
                 <div class="card-body">
                     <p class="dropzone-hint" data-i18n="step4.languageNotice">
-                        The default template is in German because emails are sent to German-speaking therapists. The UI language only affects this interface.
+                        Emails are sent to German-speaking therapists, so the greeting, contact info, and closing are in German. The UI language only affects this interface.
                     </p>
                     <form id="template-form" class="form">
                         <div class="form-group">
-                            <label for="template-body" data-i18n="step4.bodyLabel">Email body</label>
+                            <label data-i18n="step4.greetingLabel">Greeting (auto-generated)</label>
+                            <pre id="template-greeting-readonly" class="template-readonly"></pre>
+                        </div>
+                        <div class="form-group">
+                            <label for="template-body" data-i18n="step4.bodyLabel">Your message</label>
                             <textarea
                                 id="template-body"
                                 name="template_body"
-                                rows="14"
+                                rows="10"
                                 class="template-editor"
+                                data-i18n-placeholder="step4.bodyPlaceholder"
+                                placeholder="Write the body of your email here…"
                                 required></textarea>
-                            <p class="dropzone-hint" data-i18n-html="step4.bodyHint">
-                                Use <code>&lt;ANREDE&gt;</code> as the salutation placeholder.
-                                Curly-brace placeholders like <code>{name}</code>, <code>{telefon}</code>,
-                                <code>{email}</code>, <code>{vermittlungscode}</code> are replaced with your info.
-                            </p>
+                        </div>
+                        <div class="form-group">
+                            <label data-i18n="step4.basicInfoLabel">Your contact info</label>
+                            <pre id="template-basic-info-readonly" class="template-readonly"></pre>
+                        </div>
+                        <div class="form-group">
+                            <label data-i18n="step4.closingLabel">Closing</label>
+                            <pre id="template-closing-readonly" class="template-readonly"></pre>
                         </div>
                         <div class="template-preview">
                             <div class="template-preview-header">
