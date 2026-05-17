@@ -214,3 +214,7 @@ pdf_therapist_parser.py
 therapist_processor.py
 install.sh
 requirements.txt
+
+# GitNexus & Claude Code local artifacts
+.gitnexus/
+.claude/
