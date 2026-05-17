@@ -54,7 +54,9 @@ def _build_source(name: str, settings: Settings) -> object | None:
 
 def _therapist_to_response(t: TherapistData) -> TherapistResponse:
     key = t.specialty or specialties.infer_key(t)
-    label = specialties.SPECIALTIES[key].label if key in specialties.SPECIALTIES else None
+    label = (
+        specialties.SPECIALTIES[key].label if key in specialties.SPECIALTIES else None
+    )
     return TherapistResponse(
         name=t.name,
         address=t.address,
@@ -144,7 +146,11 @@ async def search_by_address(
         origin.lon,
         # Over-fetch so the post-filter has room to drop non-matching hits
         # without starving the response.
-        request.max_results * 4 if not specialties.is_all(spec) else request.max_results,
+        (
+            request.max_results * 4
+            if not specialties.is_all(spec)
+            else request.max_results
+        ),
         geocoder=geocoder,
     )
     geocoder.close()

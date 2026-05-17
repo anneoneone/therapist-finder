@@ -135,5 +135,3 @@ def _extract_insurance(soup: BeautifulSoup) -> InsuranceType | None:
     if has_privat:
         return "privat"
     return None
-
-
