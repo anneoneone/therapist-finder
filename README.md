@@ -107,6 +107,21 @@ output_directory: "clients"
 default_subject: "Terminanfrage"
 ```
 
+### Contacts database
+
+The `/api/contacts/*` endpoints (used for the send-queue balancer and
+"don't email the same therapist twice" dedupe) persist to a SQLite file.
+Path is configurable via `THERAPIST_FINDER_CONTACTS_DB`; default is
+`contacts.db` in the working directory.
+
+> ⚠️ **Render free tier:** the service runs on ephemeral disk, so
+> `contacts.db` is wiped on every redeploy and after long idle periods.
+> Counts and per-browser history reset with it. For durable storage,
+> attach a Render persistent disk and point `THERAPIST_FINDER_CONTACTS_DB`
+> at a path on it, or migrate the store to managed Postgres
+> (`therapist_finder/api/contacts_store.py` is the only module that needs
+> to change).
+
 ## Development
 
 ### Setup Development Environment
