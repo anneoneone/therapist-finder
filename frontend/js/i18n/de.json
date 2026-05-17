@@ -21,6 +21,12 @@
   "common.continue": "Weiter →",
 
   "step1.heading": "Therapeut:innen aus einer PDF laden",
+  "step1.howToTitle": "So bekommen Sie die PDF-URL von Psych-Info",
+  "step1.howStep1": "Öffnen Sie <a href=\"https://psych-info.de/\" target=\"_blank\" rel=\"noopener noreferrer\">psych-info.de</a>",
+  "step1.howStep2": "Suchen Sie nach Therapeut:innen an Ihrem Wunschort",
+  "step1.howStep3": "Erstellen Sie die PDF (Schaltfläche <strong>„Liste erstellen für Ausdruck“</strong>)",
+  "step1.howStep4": "Kopieren Sie die URL der geöffneten PDF (z. B. <code>https://psych-info.de/wp-content/uploads/pdf/psych-info_resultate_6a0ax0x0x0x0.pdf</code>)",
+  "step1.howStep5": "Fügen Sie die URL unten in das Feld ein",
   "step1.urlLabel": "Psych-Info-PDF-URL *",
   "step1.urlPlaceholder": "https://psych-info.de/wp-content/uploads/pdf/psych-info_resultate_…pdf",
   "step1.urlHint": "Fügen Sie den Link zu einer Psych-Info-„Resultate“-PDF ein. Die Datei wird serverseitig geladen und ausgewertet; im nächsten Schritt erscheint die sortierte Liste der Therapeut:innen.",

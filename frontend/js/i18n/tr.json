@@ -21,6 +21,12 @@
   "common.continue": "Devam et →",
 
   "step1.heading": "PDF'den terapistleri yükle",
+  "step1.howToTitle": "Psych-Info'dan PDF URL'sini nasıl alırsınız",
+  "step1.howStep1": "<a href=\"https://psych-info.de/\" target=\"_blank\" rel=\"noopener noreferrer\">psych-info.de</a> adresini açın",
+  "step1.howStep2": "Tercih ettiğiniz konumda terapist arayın",
+  "step1.howStep3": "PDF'yi oluşturun (<strong>“Liste erstellen für Ausdruck”</strong> düğmesi)",
+  "step1.howStep4": "Açılan PDF'nin URL'sini kopyalayın (ör. <code>https://psych-info.de/wp-content/uploads/pdf/psych-info_resultate_6a0ax0x0x0x0.pdf</code>)",
+  "step1.howStep5": "URL'yi aşağıdaki alana yapıştırın",
   "step1.urlLabel": "Psych-Info PDF URL'si *",
   "step1.urlPlaceholder": "https://psych-info.de/wp-content/uploads/pdf/psych-info_resultate_…pdf",
   "step1.urlHint": "Psych-Info \"Resultate\" PDF bağlantısını yapıştırın. Bağlantıyı sunucuda indirip ayrıştırırız ve bir sonraki adımda sıralı terapist listesini gösteririz.",

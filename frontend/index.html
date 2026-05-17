@@ -56,6 +56,16 @@
                 </div>
                 <div class="card-body">
                     <div id="search-section">
+                        <details class="instructions-details" id="psych-info-help">
+                            <summary data-i18n="step1.howToTitle">How to get the PDF URL from Psych-Info</summary>
+                            <ol class="instructions-list">
+                                <li data-i18n-html="step1.howStep1">Open <a href="https://psych-info.de/" target="_blank" rel="noopener noreferrer">psych-info.de</a></li>
+                                <li data-i18n="step1.howStep2">Search for therapists at your preferred location</li>
+                                <li data-i18n-html="step1.howStep3">Generate the PDF (button <strong>&ldquo;Liste erstellen f&uuml;r Ausdruck&rdquo;</strong>)</li>
+                                <li data-i18n-html="step1.howStep4">Copy the URL of the opened PDF (e.g. <code>https://psych-info.de/wp-content/uploads/pdf/psych-info_resultate_6a0ax0x0x0x0.pdf</code>)</li>
+                                <li data-i18n="step1.howStep5">Paste the URL into the field below</li>
+                            </ol>
+                        </details>
                         <form id="search-form" class="form">
                             <div class="form-group">
                                 <label for="search-pdf-url" data-i18n="step1.urlLabel">Psych-Info PDF URL *</label>

@@ -21,6 +21,12 @@
   "common.continue": "Continue →",
 
   "step1.heading": "Load therapists from a PDF",
+  "step1.howToTitle": "How to get the PDF URL from Psych-Info",
+  "step1.howStep1": "Open <a href=\"https://psych-info.de/\" target=\"_blank\" rel=\"noopener noreferrer\">psych-info.de</a>",
+  "step1.howStep2": "Search for therapists at your preferred location",
+  "step1.howStep3": "Generate the PDF (button <strong>“Liste erstellen für Ausdruck”</strong>)",
+  "step1.howStep4": "Copy the URL of the opened PDF (e.g. <code>https://psych-info.de/wp-content/uploads/pdf/psych-info_resultate_6a0ax0x0x0x0.pdf</code>)",
+  "step1.howStep5": "Paste the URL into the field below",
   "step1.urlLabel": "Psych-Info PDF URL *",
   "step1.urlPlaceholder": "https://psych-info.de/wp-content/uploads/pdf/psych-info_resultate_…pdf",
   "step1.urlHint": "Paste the link to a Psych-Info \"Resultate\" PDF. We'll fetch and parse it on the server, then show the ranked list of therapists in the next step.",
