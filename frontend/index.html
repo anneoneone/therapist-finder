@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Therapist Finder</title>
+    <title data-i18n="app.title">Therapist Finder</title>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,9 +13,15 @@
 <body>
     <div class="app">
         <header class="header">
-            <div class="container">
-                <h1 class="logo">🔍 Therapist Finder</h1>
-                <p class="tagline">Parse therapist data and generate personalized emails</p>
+            <div class="container header-row">
+                <div class="header-text">
+                    <h1 class="logo">🔍 <span data-i18n="app.title">Therapist Finder</span></h1>
+                    <p class="tagline" data-i18n="app.tagline">Parse therapist data and generate personalized emails</p>
+                </div>
+                <div class="lang-switcher">
+                    <label for="lang-select" class="visually-hidden" data-i18n="lang.label">Language</label>
+                    <select id="lang-select" class="lang-select" aria-label="Language"></select>
+                </div>
             </div>
         </header>
 
@@ -23,19 +29,19 @@
             <div class="container">
                 <ol class="stepper-list">
                     <li class="stepper-item" data-step="url">
-                        <a href="#/url"><span class="stepper-num">1</span><span class="stepper-label">PDF URL</span></a>
+                        <a href="#/url"><span class="stepper-num">1</span><span class="stepper-label" data-i18n="stepper.url">PDF URL</span></a>
                     </li>
                     <li class="stepper-item" data-step="overview">
-                        <a href="#/overview"><span class="stepper-num">2</span><span class="stepper-label">Overview</span></a>
+                        <a href="#/overview"><span class="stepper-num">2</span><span class="stepper-label" data-i18n="stepper.overview">Overview</span></a>
                     </li>
                     <li class="stepper-item" data-step="me">
-                        <a href="#/me"><span class="stepper-num">3</span><span class="stepper-label">My info</span></a>
+                        <a href="#/me"><span class="stepper-num">3</span><span class="stepper-label" data-i18n="stepper.me">My info</span></a>
                     </li>
                     <li class="stepper-item" data-step="template">
-                        <a href="#/template"><span class="stepper-num">4</span><span class="stepper-label">Mail body</span></a>
+                        <a href="#/template"><span class="stepper-num">4</span><span class="stepper-label" data-i18n="stepper.template">Mail body</span></a>
                     </li>
                     <li class="stepper-item" data-step="send">
-                        <a href="#/send"><span class="stepper-num">5</span><span class="stepper-label">Send</span></a>
+                        <a href="#/send"><span class="stepper-num">5</span><span class="stepper-label" data-i18n="stepper.send">Send</span></a>
                     </li>
                 </ol>
             </div>
@@ -46,35 +52,36 @@
             <section class="view card" id="view-url">
                 <div class="card-header">
                     <span class="step-badge">1</span>
-                    <h2>Load therapists from a PDF</h2>
+                    <h2 data-i18n="step1.heading">Load therapists from a PDF</h2>
                 </div>
                 <div class="card-body">
                     <div id="search-section">
                         <form id="search-form" class="form">
                             <div class="form-group">
-                                <label for="search-pdf-url">Psych-Info PDF URL *</label>
+                                <label for="search-pdf-url" data-i18n="step1.urlLabel">Psych-Info PDF URL *</label>
                                 <input
                                     type="url"
                                     id="search-pdf-url"
                                     name="pdf_url"
                                     inputmode="url"
+                                    data-i18n-placeholder="step1.urlPlaceholder"
                                     placeholder="https://psych-info.de/wp-content/uploads/pdf/psych-info_resultate_…pdf"
                                     required>
-                                <p class="dropzone-hint">
+                                <p class="dropzone-hint" data-i18n="step1.urlHint">
                                     Paste the link to a Psych-Info "Resultate" PDF.
                                     We'll fetch and parse it on the server, then
                                     show the ranked list of therapists in the next step.
                                 </p>
                             </div>
                             <button type="submit" class="btn btn-primary btn-lg" id="search-btn">
-                                <span class="btn-text">Load list</span>
+                                <span class="btn-text" data-i18n="step1.loadBtn">Load list</span>
                                 <span class="btn-loader" hidden></span>
                             </button>
                         </form>
                         <div class="status" id="search-status" hidden></div>
                         <p class="dropzone-hint">
-                            Have a local file?
-                            <a href="#" id="toggle-upload">Upload a PDF / text file instead</a>.
+                            <span data-i18n="step1.toggleUploadIntro">Have a local file?</span>
+                            <a href="#" id="toggle-upload" data-i18n="step1.toggleUploadLink">Upload a PDF / text file instead</a>.
                         </p>
                     </div>
 
@@ -83,22 +90,22 @@
                             <input type="file" id="file-input" accept=".pdf,.txt" hidden>
                             <div class="dropzone-content">
                                 <span class="dropzone-icon">📄</span>
-                                <p class="dropzone-text">Drag &amp; drop your PDF or text file here</p>
-                                <p class="dropzone-hint">or click to browse</p>
+                                <p class="dropzone-text" data-i18n="step1.dropzoneText">Drag &amp; drop your PDF or text file here</p>
+                                <p class="dropzone-hint" data-i18n="step1.dropzoneHint">or click to browse</p>
                             </div>
                             <div class="dropzone-file" id="selected-file" hidden>
                                 <span class="file-icon">📎</span>
                                 <span class="file-name" id="file-name"></span>
-                                <button class="btn-icon" id="remove-file" title="Remove file">✕</button>
+                                <button class="btn-icon" id="remove-file" data-i18n-title="step1.removeFile" title="Remove file">✕</button>
                             </div>
                         </div>
                         <button class="btn btn-primary btn-lg" id="upload-btn" disabled>
-                            <span class="btn-text">Parse File</span>
+                            <span class="btn-text" data-i18n="step1.parseBtn">Parse file</span>
                             <span class="btn-loader" hidden></span>
                         </button>
                         <div class="status" id="upload-status" hidden></div>
                         <p class="dropzone-hint">
-                            <a href="#" id="toggle-search">← Back to URL input</a>
+                            <a href="#" id="toggle-search" data-i18n="step1.toggleSearchLink">← Back to URL input</a>
                         </p>
                     </div>
                 </div>
@@ -108,27 +115,27 @@
             <section class="view card" id="view-overview">
                 <div class="card-header">
                     <span class="step-badge">2</span>
-                    <h2>Overview</h2>
+                    <h2 data-i18n="step2.heading">Overview</h2>
                     <div class="card-actions">
-                        <button class="btn btn-secondary" id="download-table" type="button">
-                            📊 Download Table
+                        <button class="btn btn-secondary" id="download-table" type="button" data-i18n="step2.downloadBtn">
+                            📊 Download table
                         </button>
                     </div>
                 </div>
                 <div class="card-body">
                     <div class="results-summary" id="results-summary"></div>
                     <details class="overview-details" id="overview-details">
-                        <summary>Show full therapist list</summary>
+                        <summary data-i18n="step2.showAll">Show full therapist list</summary>
                         <div class="table-container">
                             <table class="table" id="therapists-table">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
-                                        <th>Specialty</th>
-                                        <th>Email</th>
-                                        <th>Phone</th>
-                                        <th>Address</th>
-                                        <th>Status</th>
+                                        <th data-i18n="step2.colName">Name</th>
+                                        <th data-i18n="step2.colSpecialty">Specialty</th>
+                                        <th data-i18n="step2.colEmail">Email</th>
+                                        <th data-i18n="step2.colPhone">Phone</th>
+                                        <th data-i18n="step2.colAddress">Address</th>
+                                        <th data-i18n="step2.colStatus">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody id="therapists-tbody">
@@ -137,8 +144,8 @@
                         </div>
                     </details>
                     <div class="view-actions">
-                        <a href="#/url" class="btn btn-secondary">← Back</a>
-                        <a href="#/me" class="btn btn-primary">Continue →</a>
+                        <a href="#/url" class="btn btn-secondary" data-i18n="common.back">← Back</a>
+                        <a href="#/me" class="btn btn-primary" data-i18n="common.continue">Continue →</a>
                     </div>
                 </div>
             </section>
@@ -147,44 +154,44 @@
             <section class="view card" id="view-me">
                 <div class="card-header">
                     <span class="step-badge">3</span>
-                    <h2>Your Information</h2>
+                    <h2 data-i18n="step3.heading">Your information</h2>
                 </div>
                 <div class="card-body">
                     <form id="userinfo-form" class="form">
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="first-name">First Name *</label>
+                                <label for="first-name" data-i18n="step3.firstName">First name *</label>
                                 <input type="text" id="first-name" name="first_name" required>
                             </div>
                             <div class="form-group">
-                                <label for="last-name">Last Name *</label>
+                                <label for="last-name" data-i18n="step3.lastName">Last name *</label>
                                 <input type="text" id="last-name" name="last_name" required>
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="birth-date">Birth Date</label>
-                                <input type="text" id="birth-date" name="birth_date" placeholder="DD.MM.YYYY">
+                                <label for="birth-date" data-i18n="step3.birthDate">Birth date</label>
+                                <input type="text" id="birth-date" name="birth_date" data-i18n-placeholder="step3.birthDatePlaceholder" placeholder="DD.MM.YYYY">
                             </div>
                             <div class="form-group">
-                                <label for="insurance">Health Insurance</label>
-                                <input type="text" id="insurance" name="insurance" placeholder="e.g., TK, AOK">
+                                <label for="insurance" data-i18n="step3.insurance">Health insurance</label>
+                                <input type="text" id="insurance" name="insurance" data-i18n-placeholder="step3.insurancePlaceholder" placeholder="e.g., TK, AOK">
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="email">Email</label>
+                                <label for="email" data-i18n="step3.email">Email</label>
                                 <input type="email" id="email" name="email">
                             </div>
                             <div class="form-group">
-                                <label for="phone">Phone</label>
+                                <label for="phone" data-i18n="step3.phone">Phone</label>
                                 <input type="tel" id="phone" name="phone">
                             </div>
                         </div>
                         <div class="view-actions">
-                            <a href="#/overview" class="btn btn-secondary">← Back</a>
+                            <a href="#/overview" class="btn btn-secondary" data-i18n="common.back">← Back</a>
                             <button type="submit" class="btn btn-primary btn-lg">
-                                <span class="btn-text">Continue →</span>
+                                <span class="btn-text" data-i18n="common.continue">Continue →</span>
                                 <span class="btn-loader" hidden></span>
                             </button>
                         </div>
@@ -197,19 +204,22 @@
             <section class="view card" id="view-template">
                 <div class="card-header">
                     <span class="step-badge">4</span>
-                    <h2>Mail Template</h2>
+                    <h2 data-i18n="step4.heading">Mail template</h2>
                 </div>
                 <div class="card-body">
+                    <p class="dropzone-hint" data-i18n="step4.languageNotice">
+                        The default template is in German because emails are sent to German-speaking therapists. The UI language only affects this interface.
+                    </p>
                     <form id="template-form" class="form">
                         <div class="form-group">
-                            <label for="template-body">Email body</label>
+                            <label for="template-body" data-i18n="step4.bodyLabel">Email body</label>
                             <textarea
                                 id="template-body"
                                 name="template_body"
                                 rows="14"
                                 class="template-editor"
                                 required></textarea>
-                            <p class="dropzone-hint">
+                            <p class="dropzone-hint" data-i18n-html="step4.bodyHint">
                                 Use <code>&lt;ANREDE&gt;</code> as the salutation placeholder.
                                 Curly-brace placeholders like <code>{name}</code>, <code>{telefon}</code>,
                                 <code>{email}</code>, <code>{vermittlungscode}</code> are replaced with your info.
@@ -217,16 +227,16 @@
                         </div>
                         <div class="template-preview">
                             <div class="template-preview-header">
-                                <span>Live preview</span>
+                                <span data-i18n="step4.previewHeader">Live preview</span>
                                 <span class="template-preview-target" id="template-preview-target"></span>
                             </div>
                             <pre id="template-preview-body" class="template-preview-body"></pre>
                         </div>
                         <div class="status" id="template-status" hidden></div>
                         <div class="view-actions">
-                            <a href="#/me" class="btn btn-secondary">← Back</a>
+                            <a href="#/me" class="btn btn-secondary" data-i18n="common.back">← Back</a>
                             <button type="submit" class="btn btn-primary btn-lg" id="template-continue">
-                                <span class="btn-text">Generate &amp; continue →</span>
+                                <span class="btn-text" data-i18n="step4.submitBtn">Generate &amp; continue →</span>
                                 <span class="btn-loader" hidden></span>
                             </button>
                         </div>
@@ -239,33 +249,33 @@
                 <div class="card-header">
                     <span class="step-badge">5</span>
                     <h2>
-                        Contact therapist
-                        <span id="queue-position">1</span> of <span id="queue-total">1</span>
+                        <span data-i18n="step5.heading">Contact therapist</span>
+                        <span id="queue-position">1</span> <span data-i18n="step5.queueOf">of</span> <span id="queue-total">1</span>
                     </h2>
                 </div>
                 <div class="card-body">
                     <div class="queue-therapist" id="queue-therapist"></div>
                     <div class="queue-preview">
                         <div class="queue-preview-row">
-                            <span class="queue-preview-label">Subject</span>
+                            <span class="queue-preview-label" data-i18n="step5.subjectLabel">Subject</span>
                             <span id="queue-subject"></span>
                         </div>
                         <div class="queue-preview-row queue-preview-body">
-                            <span class="queue-preview-label">Body</span>
+                            <span class="queue-preview-label" data-i18n="step5.bodyLabel">Body</span>
                             <pre id="queue-body-preview"></pre>
                         </div>
                     </div>
-                    <div class="queue-warning" id="queue-truncation-warning" hidden>
+                    <div class="queue-warning" id="queue-truncation-warning" data-i18n="step5.truncationWarning" hidden>
                         ⚠️ This email is long and may be cut off when your mail app opens it.
-                        Use <strong>Copy body</strong> to paste the full text into the compose window.
+                        Use Copy body to paste the full text into the compose window.
                     </div>
                     <div class="status" id="queue-status" hidden></div>
                     <div class="view-actions queue-actions">
-                        <a href="#/template" class="btn btn-secondary">← Back</a>
-                        <button class="btn btn-secondary" id="queue-copy-body" type="button">📋 Copy body</button>
-                        <button class="btn btn-secondary" id="queue-skip" type="button">Skip</button>
-                        <button class="btn btn-primary" id="queue-open" type="button">📧 Open in mail app</button>
-                        <button class="btn btn-primary" id="queue-next" type="button" disabled>Next →</button>
+                        <a href="#/template" class="btn btn-secondary" data-i18n="common.back">← Back</a>
+                        <button class="btn btn-secondary" id="queue-copy-body" type="button" data-i18n="step5.copyBtn">📋 Copy body</button>
+                        <button class="btn btn-secondary" id="queue-skip" type="button" data-i18n="step5.skipBtn">Skip</button>
+                        <button class="btn btn-primary" id="queue-open" type="button" data-i18n="step5.openBtn">📧 Open in mail app</button>
+                        <button class="btn btn-primary" id="queue-next" type="button" data-i18n="step5.nextBtn" disabled>Next →</button>
                     </div>
                 </div>
             </section>
@@ -273,7 +283,7 @@
 
         <footer class="footer">
             <div class="container">
-                <p>Therapist Finder — Made for finding the right therapist</p>
+                <p data-i18n="app.footer">Therapist Finder — Made for finding the right therapist</p>
             </div>
         </footer>
     </div>

@@ -11,6 +11,14 @@ import {
     parseFile,
     parseUrl,
 } from './api.js';
+import {
+    SUPPORTED_LANGS,
+    currentLanguage,
+    initI18n,
+    onLanguageChange,
+    setLanguage,
+    t,
+} from './i18n.js';
 
 // ============================================
 // Constants
@@ -119,6 +127,9 @@ const elements = {
     // Stepper
     stepperItems: document.querySelectorAll('.stepper-item'),
     views: document.querySelectorAll('.view'),
+
+    // Language switcher
+    langSelect: $('lang-select'),
 };
 
 // ============================================
@@ -260,7 +271,7 @@ async function handlePdfUrlSubmit(event) {
     if (!url) return;
 
     setButtonLoading(elements.searchBtn, true);
-    showStatus(elements.searchStatus, 'Fetching and parsing PDF…', 'info');
+    showStatus(elements.searchStatus, t('step1.statusFetching'), 'info');
 
     try {
         const result = await parseUrl(url);
@@ -270,22 +281,16 @@ async function handlePdfUrlSubmit(event) {
         persistState();
 
         const total = state.therapists.length;
-        const withEmail = state.therapists.filter((t) => t.email).length;
-        showStatus(
-            elements.searchStatus,
-            `✓ ${total} therapist${total === 1 ? '' : 's'} parsed `
-                + `(${withEmail} with email)`,
-            'success'
-        );
+        const withEmail = state.therapists.filter((th) => th.email).length;
+        const key = total === 1 ? 'step1.statusParsedSingular' : 'step1.statusParsedPlural';
+        showStatus(elements.searchStatus, t(key, { total, withEmail }), 'success');
 
         navigate('overview');
     } catch (error) {
         console.error('Parse URL error:', error);
         showStatus(
             elements.searchStatus,
-            error instanceof APIError
-                ? error.message
-                : 'Failed to load PDF. Please check the URL and try again.',
+            error instanceof APIError ? error.message : t('step1.statusFetchFailed'),
             'error'
         );
     } finally {
@@ -303,7 +308,7 @@ function handleFileSelect(file) {
     );
 
     if (!hasValidType && !hasValidExtension) {
-        showStatus(elements.uploadStatus, 'Please select a PDF or text file', 'error');
+        showStatus(elements.uploadStatus, t('step1.statusInvalidFile'), 'error');
         return;
     }
 
@@ -328,7 +333,7 @@ async function handleUpload() {
     if (!selectedFile) return;
 
     setButtonLoading(elements.uploadBtn, true);
-    showStatus(elements.uploadStatus, 'Parsing file...', 'info');
+    showStatus(elements.uploadStatus, t('step1.statusParsingFile'), 'info');
 
     try {
         const result = await parseFile(selectedFile);
@@ -338,22 +343,17 @@ async function handleUpload() {
         persistState();
 
         const total = state.therapists.length;
-        const withEmail = state.therapists.filter((t) => t.email).length;
-        showStatus(
-            elements.uploadStatus,
-            `✓ ${withEmail} contactable therapist${withEmail === 1 ? '' : 's'} `
-                + `(of ${total} parsed)`,
-            'success'
-        );
+        const withEmail = state.therapists.filter((th) => th.email).length;
+        const key =
+            withEmail === 1 ? 'step1.statusUploadedSingular' : 'step1.statusUploadedPlural';
+        showStatus(elements.uploadStatus, t(key, { total, withEmail }), 'success');
 
         navigate('overview');
     } catch (error) {
         console.error('Upload error:', error);
         showStatus(
             elements.uploadStatus,
-            error instanceof APIError
-                ? error.message
-                : 'Failed to parse file. Please try again.',
+            error instanceof APIError ? error.message : t('step1.statusUploadFailed'),
             'error'
         );
     } finally {
@@ -372,11 +372,11 @@ function renderTherapists() {
     elements.resultsSummary.innerHTML = `
         <div class="summary-item">
             <div class="summary-value">${therapists.length}</div>
-            <div class="summary-label">Total Therapists</div>
+            <div class="summary-label">${escapeHtml(t('step2.summaryTotal'))}</div>
         </div>
         <div class="summary-item">
             <div class="summary-value">${contactable}</div>
-            <div class="summary-label">Contactable (have email)</div>
+            <div class="summary-label">${escapeHtml(t('step2.summaryContactable'))}</div>
         </div>
     `;
 
@@ -384,7 +384,7 @@ function renderTherapists() {
         .map((therapist) => {
             const hasEmail = !!therapist.email;
             const statusClass = hasEmail ? 'ready' : 'no-email';
-            const statusText = hasEmail ? 'Ready' : 'No Email';
+            const statusText = hasEmail ? t('step2.statusReady') : t('step2.statusNoEmail');
             const specialty = therapist.specialty_label || therapist.specialty || '';
             return `
                 <tr>
@@ -492,7 +492,7 @@ function renderTemplatePreview() {
 
     if (!therapist) {
         elements.templatePreviewTarget.textContent = '';
-        elements.templatePreviewBody.textContent = '(No therapist to preview against.)';
+        elements.templatePreviewBody.textContent = t('step4.previewEmpty');
         return;
     }
 
@@ -509,13 +509,13 @@ function renderTemplatePreview() {
         .replace(/\{email\}/g, ui.email || '')
         .replace(/\{vermittlungscode\}/g, '');
 
-    elements.templatePreviewTarget.textContent = `for: ${therapist.name}`;
+    elements.templatePreviewTarget.textContent = t('step4.previewTarget', { name: therapist.name });
     elements.templatePreviewBody.textContent = rendered;
 }
 
 async function initTemplateView() {
     if (!state.templateBody) {
-        showStatus(elements.templateStatus, 'Loading default template…', 'info');
+        showStatus(elements.templateStatus, t('step4.statusLoadingTemplate'), 'info');
         try {
             const result = await getTemplate();
             state.templateBody = result.body || '';
@@ -525,9 +525,7 @@ async function initTemplateView() {
             console.error('Load template error:', error);
             showStatus(
                 elements.templateStatus,
-                error instanceof APIError
-                    ? error.message
-                    : 'Failed to load default template.',
+                error instanceof APIError ? error.message : t('step4.statusLoadTemplateFailed'),
                 'error'
             );
         }
@@ -545,7 +543,7 @@ async function handleTemplateSubmit(event) {
     persistState();
 
     setButtonLoading(elements.templateContinue, true);
-    showStatus(elements.templateStatus, 'Generating emails…', 'info');
+    showStatus(elements.templateStatus, t('step4.statusGenerating'), 'info');
 
     try {
         const result = await generateEmails(state.therapists, state.userInfo, body);
@@ -559,9 +557,7 @@ async function handleTemplateSubmit(event) {
         console.error('Generation error:', error);
         showStatus(
             elements.templateStatus,
-            error instanceof APIError
-                ? error.message
-                : 'Failed to generate emails. Please try again.',
+            error instanceof APIError ? error.message : t('step4.statusGenerateFailed'),
             'error'
         );
     } finally {
@@ -639,11 +635,7 @@ function currentQueueDraft() {
 function initSendView() {
     const drafts = (state.results && state.results.drafts) || [];
     if (drafts.length === 0) {
-        showStatus(
-            elements.queueStatus,
-            'No drafts available. Go back and generate emails first.',
-            'warning'
-        );
+        showStatus(elements.queueStatus, t('step5.statusNoDrafts'), 'warning');
         return;
     }
 
@@ -662,11 +654,7 @@ function initSendView() {
     }
 
     if (state.queue.items.length === 0) {
-        showStatus(
-            elements.queueStatus,
-            'All therapists from this list were already contacted. Clear your browser storage to start over.',
-            'info'
-        );
+        showStatus(elements.queueStatus, t('step5.statusAllContacted'), 'info');
         elements.queueTherapist.innerHTML = '';
         elements.queueSubject.textContent = '';
         elements.queueBodyPreview.textContent = '';
@@ -681,7 +669,7 @@ function initSendView() {
 function renderQueueItem() {
     const draft = currentQueueDraft();
     if (!draft) {
-        showStatus(elements.queueStatus, '✓ Queue complete.', 'success');
+        showStatus(elements.queueStatus, t('step5.statusQueueComplete'), 'success');
         elements.queueTherapist.innerHTML = '';
         elements.queueSubject.textContent = '';
         elements.queueBodyPreview.textContent = '';
@@ -724,11 +712,7 @@ function handleQueueOpen() {
     markEmailContacted(draft.to);
     elements.queueNext.disabled = false;
     elements.queueOpen.disabled = true;
-    showStatus(
-        elements.queueStatus,
-        'Mail app opened. Click Next when ready for the next therapist.',
-        'info'
-    );
+    showStatus(elements.queueStatus, t('step5.statusMailOpened'), 'info');
 }
 
 function handleQueueNext() {
@@ -748,14 +732,10 @@ async function handleQueueCopyBody() {
     if (!draft) return;
     try {
         await navigator.clipboard.writeText(draft.body || '');
-        showStatus(elements.queueStatus, '✓ Email body copied to clipboard.', 'success');
+        showStatus(elements.queueStatus, t('step5.statusBodyCopied'), 'success');
     } catch (error) {
         console.warn('Clipboard write failed:', error);
-        showStatus(
-            elements.queueStatus,
-            'Could not access clipboard. Select the text in the preview and copy manually.',
-            'warning'
-        );
+        showStatus(elements.queueStatus, t('step5.statusClipboardFailed'), 'warning');
     }
 }
 
@@ -821,15 +801,43 @@ function initEventListeners() {
     elements.queueSkip.addEventListener('click', handleQueueSkip);
     elements.queueCopyBody.addEventListener('click', handleQueueCopyBody);
 
+    // Language switcher
+    if (elements.langSelect) {
+        elements.langSelect.addEventListener('change', (e) => {
+            setLanguage(e.target.value);
+        });
+    }
+
     // Router
     window.addEventListener('hashchange', renderRoute);
+}
+
+function populateLanguageSelector() {
+    const select = elements.langSelect;
+    if (!select) return;
+    select.innerHTML = SUPPORTED_LANGS.map(
+        (l) => `<option value="${l.code}">${l.nativeName}</option>`
+    ).join('');
+    select.value = currentLanguage();
+}
+
+function handleLanguageChange() {
+    if (elements.langSelect) elements.langSelect.value = currentLanguage();
+    // Re-render any dynamic content that was built before language changed.
+    const step = currentStep();
+    if (step === 'overview' && state.therapists.length) renderTherapists();
+    if (step === 'template') renderTemplatePreview();
+    if (step === 'send') renderQueueItem();
 }
 
 // ============================================
 // Init
 // ============================================
 
-function init() {
+async function init() {
+    await initI18n();
+    populateLanguageSelector();
+    onLanguageChange(handleLanguageChange);
     initEventListeners();
     if (!window.location.hash) {
         window.location.hash = '#/url';
