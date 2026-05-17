@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from therapist_finder.api.main import app
 
-PSYCH_INFO_PDF = Path("/tmp/psych_info_sample.pdf")
+PSYCH_INFO_PDF = Path(__file__).parent / "fixtures" / "psych_info_resultate_sample.pdf"
 
 
 def _fake_pdf_response(
@@ -24,11 +24,6 @@ def _fake_pdf_response(
 
 def test_parse_url_happy_path() -> None:
     """Downloads bytes from psych-info.de and returns parsed therapists."""
-    assert PSYCH_INFO_PDF.exists(), (
-        "Run `curl -sL -o /tmp/psych_info_sample.pdf "
-        "https://psych-info.de/wp-content/uploads/pdf/"
-        "psych-info_resultate_6a0a1fd11c22f.pdf` before running this test"
-    )
     pdf_bytes = PSYCH_INFO_PDF.read_bytes()
 
     client_mock = MagicMock()
