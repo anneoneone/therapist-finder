@@ -66,7 +66,9 @@ const defaultState = () => ({
     userInfo: {},
     templateBody: '',
     contactFields: { name: true, phone: true, email: true, vermittlungscode: true },
+    targetLang: 'de',
     closingText: '',
+    closingCustomized: false,
     results: null,
     queue: { items: [], index: 0 },
 });
@@ -131,6 +133,7 @@ const elements = {
     // Step 4
     viewTemplate: $('view-template'),
     templateForm: $('template-form'),
+    targetLang: $('target-lang'),
     templateBody: $('template-body'),
     templateGreetingReadonly: $('template-greeting-readonly'),
     templateBasicInfoReadonly: $('template-basic-info-readonly'),
@@ -508,23 +511,156 @@ function handleUserInfoSubmit(event) {
 // ============================================
 
 /**
- * Client-side mirror of EmailGenerator._generate_salutation in
- * therapist_finder/email/generator.py — preview only; the backend still
- * generates the real drafts.
+ * Per-target-language packs for the readonly sections (greeting,
+ * contact-info labels, default closing). Independent of UI i18n — the
+ * recipient sees this regardless of which UI language the sender uses.
+ * "Vermittlungscode" is kept untranslated since it's a German healthcare
+ * referral term recipients will recognise.
  */
-function generateSalutation(name) {
-    if (!name) return 'Sehr geehrte/r';
-    const titleMatch = name.match(/(Dr\.|Dipl\.-Psych\.)/);
-    const title = titleMatch ? titleMatch[0] : '';
-    const parts = name.trim().split(/\s+/);
-    const lastName = parts[parts.length - 1] || '';
-    if (name.includes('Frau')) {
-        return `Sehr geehrte Frau ${title} ${lastName}`.replace(/\s+/g, ' ').trim();
+const MAIL_LANG_PACKS = {
+    de: {
+        greetingFemale: 'Sehr geehrte Frau',
+        greetingMale: 'Sehr geehrter Herr',
+        greetingNeutral: 'Guten Tag',
+        greetingFallback: 'Sehr geehrte Damen und Herren',
+        contactHeading: 'Meine Kontaktdaten:',
+        phoneLabel: 'Tel.:',
+        emailLabel: 'E-Mail:',
+        vermittlungsLabel: 'Vermittlungscode:',
+        closing: 'Mit besten Grüßen\n{name}',
+    },
+    en: {
+        greetingFemale: 'Dear Ms.',
+        greetingMale: 'Dear Mr.',
+        greetingNeutral: 'Dear',
+        greetingFallback: 'Dear Sir or Madam',
+        contactHeading: 'My contact details:',
+        phoneLabel: 'Phone:',
+        emailLabel: 'Email:',
+        vermittlungsLabel: 'Vermittlungscode:',
+        closing: 'Best regards,\n{name}',
+    },
+    fr: {
+        greetingFemale: 'Madame',
+        greetingMale: 'Monsieur',
+        greetingNeutral: 'Bonjour',
+        greetingFallback: 'Madame, Monsieur',
+        contactHeading: 'Mes coordonnées :',
+        phoneLabel: 'Tél. :',
+        emailLabel: 'E-mail :',
+        vermittlungsLabel: 'Code de placement :',
+        closing: 'Cordialement,\n{name}',
+    },
+    es: {
+        greetingFemale: 'Estimada Sra.',
+        greetingMale: 'Estimado Sr.',
+        greetingNeutral: 'Estimado/a',
+        greetingFallback: 'Estimados señores',
+        contactHeading: 'Mis datos de contacto:',
+        phoneLabel: 'Tel.:',
+        emailLabel: 'Correo:',
+        vermittlungsLabel: 'Vermittlungscode:',
+        closing: 'Atentamente,\n{name}',
+    },
+    it: {
+        greetingFemale: 'Gentile Signora',
+        greetingMale: 'Egregio Signor',
+        greetingNeutral: 'Gentile',
+        greetingFallback: 'Gentili Signore e Signori',
+        contactHeading: 'I miei recapiti:',
+        phoneLabel: 'Tel.:',
+        emailLabel: 'E-mail:',
+        vermittlungsLabel: 'Vermittlungscode:',
+        closing: 'Cordiali saluti,\n{name}',
+    },
+    tr: {
+        greetingFemale: 'Sayın Bayan',
+        greetingMale: 'Sayın Bay',
+        greetingNeutral: 'Sayın',
+        greetingFallback: 'Sayın Yetkili',
+        contactHeading: 'İletişim bilgilerim:',
+        phoneLabel: 'Tel.:',
+        emailLabel: 'E-posta:',
+        vermittlungsLabel: 'Vermittlungscode:',
+        closing: 'Saygılarımla,\n{name}',
+    },
+    ru: {
+        greetingFemale: 'Уважаемая',
+        greetingMale: 'Уважаемый',
+        greetingNeutral: 'Уважаемый/ая',
+        greetingFallback: 'Уважаемые дамы и господа',
+        contactHeading: 'Мои контактные данные:',
+        phoneLabel: 'Тел.:',
+        emailLabel: 'Эл. почта:',
+        vermittlungsLabel: 'Vermittlungscode:',
+        closing: 'С уважением,\n{name}',
+    },
+    ar: {
+        greetingFemale: 'السيدة المحترمة',
+        greetingMale: 'السيد المحترم',
+        greetingNeutral: 'السيد/ة المحترم/ة',
+        greetingFallback: 'السادة المحترمون',
+        contactHeading: 'بيانات الاتصال الخاصة بي:',
+        phoneLabel: 'الهاتف:',
+        emailLabel: 'البريد الإلكتروني:',
+        vermittlungsLabel: 'Vermittlungscode:',
+        closing: 'مع أطيب التحيات،\n{name}',
+    },
+};
+
+function getTargetLang() {
+    const lang = state.targetLang;
+    return MAIL_LANG_PACKS[lang] ? lang : 'de';
+}
+
+function getMailPack(lang) {
+    return MAIL_LANG_PACKS[lang] || MAIL_LANG_PACKS.de;
+}
+
+/**
+ * Infer therapist gender from the backend-precomputed German salutation
+ * (which always starts with "Sehr geehrte Frau" / "Sehr geehrter Herr" /
+ * "Guten Tag" — see therapist_finder/utils/salutation.py). Falls back to
+ * a name scan if the salutation is missing.
+ */
+function inferTherapistGender(therapist) {
+    const sal = (therapist && therapist.salutation) || '';
+    if (sal.startsWith('Sehr geehrte Frau')) return 'female';
+    if (sal.startsWith('Sehr geehrter Herr')) return 'male';
+    const name = (therapist && therapist.name) || '';
+    if (/\bFrau\b/.test(name)) return 'female';
+    if (/\bHerr\b/.test(name)) return 'male';
+    return 'unknown';
+}
+
+function extractLastName(name) {
+    if (!name) return '';
+    const tokens = name.trim().split(/\s+/).filter(Boolean);
+    return tokens[tokens.length - 1] || '';
+}
+
+/**
+ * Build a salutation in the chosen target language.
+ *   - For 'de', defer to the backend-precomputed `therapist.salutation`
+ *     (it already includes title + last name).
+ *   - For others, use `<prefix> <last name>` — skipping titles keeps it
+ *     readable across languages where stacking honorifics is awkward
+ *     (e.g. "Dear Ms. Dr. Müller").
+ */
+function localizedSalutation(therapist, lang) {
+    const pack = getMailPack(lang);
+    if (lang === 'de' && therapist && therapist.salutation) {
+        return therapist.salutation;
     }
-    if (name.includes('Herr')) {
-        return `Sehr geehrter Herr ${title} ${lastName}`.replace(/\s+/g, ' ').trim();
-    }
-    return `Sehr geehrte/r ${title} ${lastName}`.replace(/\s+/g, ' ').trim();
+    const name = (therapist && therapist.name) || '';
+    if (!name) return pack.greetingFallback;
+    const lastName = extractLastName(name);
+    const gender = inferTherapistGender(therapist);
+    let prefix;
+    if (gender === 'female') prefix = pack.greetingFemale;
+    else if (gender === 'male') prefix = pack.greetingMale;
+    else prefix = pack.greetingNeutral;
+    return `${prefix} ${lastName}`.replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -546,28 +682,34 @@ function isContactFieldEnabled(field) {
  * "Tel.: " line. Placeholders (`{name}`, `{telefon}`, ...) are preserved
  * here; the backend substitutes them at draft-render time.
  */
-function buildBasicInfoBlockTemplate(userInfo) {
-    const lines = ['Meine Kontaktdaten:'];
+function buildBasicInfoBlockTemplate(userInfo, lang) {
+    const pack = getMailPack(lang);
+    const lines = [pack.contactHeading];
     if (isContactFieldEnabled('name')) lines.push('{name}');
-    if (userInfo.phone && isContactFieldEnabled('phone')) lines.push('Tel.: {telefon}');
-    if (userInfo.email && isContactFieldEnabled('email')) lines.push('E-Mail: {email}');
+    if (userInfo.phone && isContactFieldEnabled('phone')) {
+        lines.push(`${pack.phoneLabel} {telefon}`);
+    }
+    if (userInfo.email && isContactFieldEnabled('email')) {
+        lines.push(`${pack.emailLabel} {email}`);
+    }
     if (userInfo.vermittlungscode && isContactFieldEnabled('vermittlungscode')) {
-        lines.push('Vermittlungscode: {vermittlungscode}');
+        lines.push(`${pack.vermittlungsLabel} {vermittlungscode}`);
     }
     return lines.join('\n');
 }
 
 const TEMPLATE_GREETING = '<ANREDE>,';
-const DEFAULT_CLOSING_TEMPLATE = 'Mit besten Grüßen\n{name}';
 
 /**
- * Default closing seeded into `state.closingText` on first entry to step 4.
- * The closing is plain text once seeded — no placeholder substitution
- * happens at send time, so the user owns and edits it as free text.
+ * Default closing seeded into `state.closingText` on first entry to step 4
+ * and whenever the target language changes (unless the user has
+ * customized it). Closing is plain text once seeded — no placeholder
+ * substitution happens at send time.
  */
-function defaultClosingText(userInfo) {
+function defaultClosingText(userInfo, lang) {
+    const pack = getMailPack(lang);
     const fullName = `${userInfo.first_name || ''} ${userInfo.last_name || ''}`.trim();
-    return DEFAULT_CLOSING_TEMPLATE.replace(/\{name\}/g, fullName);
+    return pack.closing.replace(/\{name\}/g, fullName);
 }
 
 /**
@@ -577,14 +719,15 @@ function defaultClosingText(userInfo) {
  * closing is literal text (no placeholders).
  */
 function assembleTemplateBody(userInfo, body) {
+    const lang = getTargetLang();
     return [
         TEMPLATE_GREETING,
         '',
         body,
         '',
-        buildBasicInfoBlockTemplate(userInfo),
+        buildBasicInfoBlockTemplate(userInfo, lang),
         '',
-        state.closingText || defaultClosingText(userInfo),
+        state.closingText || defaultClosingText(userInfo, lang),
     ].join('\n');
 }
 
@@ -606,16 +749,17 @@ function renderTemplateWithSubstitutions(text, userInfo, salutation) {
 
 function renderReadonlySections() {
     const ui = state.userInfo || {};
+    const lang = getTargetLang();
     const therapist = state.therapists.find((t) => !!t.email) || state.therapists[0];
     const salutation = therapist
-        ? (therapist.salutation || generateSalutation(therapist.name))
-        : 'Sehr geehrte/r';
+        ? localizedSalutation(therapist, lang)
+        : getMailPack(lang).greetingFallback;
 
     elements.templateGreetingReadonly.textContent = renderTemplateWithSubstitutions(
         TEMPLATE_GREETING, ui, salutation
     );
     elements.templateBasicInfoReadonly.textContent = renderTemplateWithSubstitutions(
-        buildBasicInfoBlockTemplate(ui), ui, salutation
+        buildBasicInfoBlockTemplate(ui, lang), ui, salutation
     );
     // Closing is plain text once seeded; no placeholder substitution.
     elements.templateClosingReadonly.textContent = state.closingText || '';
@@ -685,17 +829,41 @@ function setClosingEditing(editing) {
 
 function handleClosingInput() {
     state.closingText = elements.closingTextarea.value;
+    state.closingCustomized = true;
     persistState();
     renderReadonlySections();
     renderTemplatePreview();
 }
 
 function handleClosingReset() {
-    state.closingText = defaultClosingText(state.userInfo || {});
+    state.closingText = defaultClosingText(state.userInfo || {}, getTargetLang());
+    state.closingCustomized = false;
     persistState();
     if (elements.closingTextarea) elements.closingTextarea.value = state.closingText;
     renderReadonlySections();
     renderTemplatePreview();
+}
+
+function handleTargetLangChange(event) {
+    const next = event.target.value;
+    if (!MAIL_LANG_PACKS[next]) return;
+    state.targetLang = next;
+    if (!state.closingCustomized) {
+        state.closingText = defaultClosingText(state.userInfo || {}, next);
+        if (elements.closingTextarea) elements.closingTextarea.value = state.closingText;
+    }
+    persistState();
+    renderReadonlySections();
+    renderTemplatePreview();
+}
+
+function populateTargetLangSelector() {
+    const select = elements.targetLang;
+    if (!select) return;
+    select.innerHTML = SUPPORTED_LANGS.map(
+        (l) => `<option value="${l.code}">${l.nativeName}</option>`
+    ).join('');
+    select.value = getTargetLang();
 }
 
 function renderTemplatePreview() {
@@ -709,7 +877,8 @@ function renderTemplatePreview() {
     }
 
     const ui = state.userInfo || {};
-    const salutation = therapist.salutation || generateSalutation(therapist.name);
+    const lang = getTargetLang();
+    const salutation = localizedSalutation(therapist, lang);
     const assembled = assembleTemplateBody(ui, body);
     const rendered = renderTemplateWithSubstitutions(assembled, ui, salutation);
 
@@ -736,10 +905,16 @@ async function initTemplateView() {
             state.templateBody = '';
         }
     }
-    if (!state.closingText) {
-        state.closingText = defaultClosingText(state.userInfo || {});
+    if (!MAIL_LANG_PACKS[state.targetLang]) {
+        state.targetLang = 'de';
         persistState();
     }
+    if (!state.closingText) {
+        state.closingText = defaultClosingText(state.userInfo || {}, getTargetLang());
+        state.closingCustomized = false;
+        persistState();
+    }
+    populateTargetLangSelector();
     elements.templateBody.value = state.templateBody;
     setContactInfoEditing(false);
     setClosingEditing(false);
@@ -760,7 +935,15 @@ async function handleTemplateSubmit(event) {
 
     try {
         const assembled = assembleTemplateBody(state.userInfo || {}, body);
-        const result = await generateEmails(state.therapists, state.userInfo, assembled);
+        const lang = getTargetLang();
+        // Stamp each therapist with the localized salutation so the backend's
+        // <ANREDE> substitution uses the chosen language instead of the
+        // German precomputed one. Backend prefers therapist.salutation when set.
+        const therapistsForSend = state.therapists.map((th) => ({
+            ...th,
+            salutation: localizedSalutation(th, lang),
+        }));
+        const result = await generateEmails(therapistsForSend, state.userInfo, assembled);
         state.results = result;
         // Reset queue position on fresh generation.
         state.queue = { items: [], index: 0 };
@@ -1048,6 +1231,9 @@ function initEventListeners() {
 
     // Step 4
     elements.templateForm.addEventListener('submit', handleTemplateSubmit);
+    if (elements.targetLang) {
+        elements.targetLang.addEventListener('change', handleTargetLangChange);
+    }
     elements.templateBody.addEventListener('input', () => {
         state.templateBody = elements.templateBody.value;
         renderTemplatePreview();
