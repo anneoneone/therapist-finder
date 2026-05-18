@@ -65,6 +65,8 @@ const defaultState = () => ({
     therapists: [],
     userInfo: {},
     templateBody: '',
+    contactFields: { name: true, phone: true, email: true, vermittlungscode: true },
+    closingText: '',
     results: null,
     queue: { items: [], index: 0 },
 });
@@ -133,6 +135,15 @@ const elements = {
     templateGreetingReadonly: $('template-greeting-readonly'),
     templateBasicInfoReadonly: $('template-basic-info-readonly'),
     templateClosingReadonly: $('template-closing-readonly'),
+    contactInfoEdit: $('contact-info-edit'),
+    contactInfoDone: $('contact-info-done'),
+    contactInfoEditor: $('template-basic-info-editor'),
+    contactFieldsCheckboxes: $('contact-fields-checkboxes'),
+    closingEdit: $('closing-edit'),
+    closingDone: $('closing-done'),
+    closingReset: $('closing-reset'),
+    closingEditor: $('template-closing-editor'),
+    closingTextarea: $('template-closing-textarea'),
     templateContinue: $('template-continue'),
     templateStatus: $('template-status'),
     templatePreviewTarget: $('template-preview-target'),
@@ -517,26 +528,53 @@ function generateSalutation(name) {
 }
 
 /**
- * Build the readonly contact-info block. Lines for missing fields are
- * omitted so the recipient never sees an empty "Tel.: " line. Placeholders
- * (`{name}`, `{telefon}`, ...) are preserved here; the backend substitutes
- * them at draft-render time.
+ * Optional contact-info fields the user can toggle on step 4. `name` is
+ * the user's full name; the heading line is always rendered. Phone, email,
+ * and Vermittlungscode are gated by whether the user entered them in step 3
+ * AND by `state.contactFields` (the per-field toggles).
+ */
+const CONTACT_OPTIONAL_FIELDS = ['name', 'phone', 'email', 'vermittlungscode'];
+
+function isContactFieldEnabled(field) {
+    const flags = state.contactFields || {};
+    return flags[field] !== false; // default to true if missing
+}
+
+/**
+ * Build the readonly contact-info block. Lines for missing or
+ * user-disabled fields are omitted so the recipient never sees an empty
+ * "Tel.: " line. Placeholders (`{name}`, `{telefon}`, ...) are preserved
+ * here; the backend substitutes them at draft-render time.
  */
 function buildBasicInfoBlockTemplate(userInfo) {
-    const lines = ['Meine Kontaktdaten:', '{name}'];
-    if (userInfo.phone) lines.push('Tel.: {telefon}');
-    if (userInfo.email) lines.push('E-Mail: {email}');
-    if (userInfo.vermittlungscode) lines.push('Vermittlungscode: {vermittlungscode}');
+    const lines = ['Meine Kontaktdaten:'];
+    if (isContactFieldEnabled('name')) lines.push('{name}');
+    if (userInfo.phone && isContactFieldEnabled('phone')) lines.push('Tel.: {telefon}');
+    if (userInfo.email && isContactFieldEnabled('email')) lines.push('E-Mail: {email}');
+    if (userInfo.vermittlungscode && isContactFieldEnabled('vermittlungscode')) {
+        lines.push('Vermittlungscode: {vermittlungscode}');
+    }
     return lines.join('\n');
 }
 
 const TEMPLATE_GREETING = '<ANREDE>,';
-const TEMPLATE_CLOSING = 'Mit besten Grüßen\n{name}';
+const DEFAULT_CLOSING_TEMPLATE = 'Mit besten Grüßen\n{name}';
+
+/**
+ * Default closing seeded into `state.closingText` on first entry to step 4.
+ * The closing is plain text once seeded — no placeholder substitution
+ * happens at send time, so the user owns and edits it as free text.
+ */
+function defaultClosingText(userInfo) {
+    const fullName = `${userInfo.first_name || ''} ${userInfo.last_name || ''}`.trim();
+    return DEFAULT_CLOSING_TEMPLATE.replace(/\{name\}/g, fullName);
+}
 
 /**
  * Compose the full template body that's sent to the backend: readonly
- * greeting + user-typed body + readonly contact info + readonly closing.
- * Placeholders remain in place; the backend handles substitution.
+ * greeting + user-typed body + readonly contact info + user-owned closing.
+ * Greeting and contact-info placeholders remain for the backend; the
+ * closing is literal text (no placeholders).
  */
 function assembleTemplateBody(userInfo, body) {
     return [
@@ -546,7 +584,7 @@ function assembleTemplateBody(userInfo, body) {
         '',
         buildBasicInfoBlockTemplate(userInfo),
         '',
-        TEMPLATE_CLOSING,
+        state.closingText || defaultClosingText(userInfo),
     ].join('\n');
 }
 
@@ -579,9 +617,85 @@ function renderReadonlySections() {
     elements.templateBasicInfoReadonly.textContent = renderTemplateWithSubstitutions(
         buildBasicInfoBlockTemplate(ui), ui, salutation
     );
-    elements.templateClosingReadonly.textContent = renderTemplateWithSubstitutions(
-        TEMPLATE_CLOSING, ui, salutation
-    );
+    // Closing is plain text once seeded; no placeholder substitution.
+    elements.templateClosingReadonly.textContent = state.closingText || '';
+}
+
+function contactFieldI18nKey(field) {
+    return `step4.contactField.${field}`;
+}
+
+function userInfoHasField(field) {
+    const ui = state.userInfo || {};
+    if (field === 'name') return !!(ui.first_name || ui.last_name);
+    return !!ui[field];
+}
+
+function renderContactFieldsCheckboxes() {
+    const container = elements.contactFieldsCheckboxes;
+    if (!container) return;
+    const available = CONTACT_OPTIONAL_FIELDS.filter(userInfoHasField);
+    if (available.length === 0) {
+        container.innerHTML = `<p class="template-section-hint">${escapeHtml(t('step4.contactFieldsEmpty'))}</p>`;
+        return;
+    }
+    container.innerHTML = available
+        .map((field) => {
+            const checked = isContactFieldEnabled(field) ? 'checked' : '';
+            const label = escapeHtml(t(contactFieldI18nKey(field)));
+            return `
+                <label class="checkbox-item">
+                    <input type="checkbox" data-field="${field}" ${checked}>
+                    <span>${label}</span>
+                </label>
+            `;
+        })
+        .join('');
+}
+
+function setContactInfoEditing(editing) {
+    if (!elements.contactInfoEditor) return;
+    elements.contactInfoEditor.hidden = !editing;
+    elements.templateBasicInfoReadonly.hidden = editing;
+    if (elements.contactInfoEdit) elements.contactInfoEdit.hidden = editing;
+    if (editing) renderContactFieldsCheckboxes();
+}
+
+function handleContactFieldToggle(event) {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') return;
+    const field = target.dataset.field;
+    if (!field) return;
+    state.contactFields = { ...(state.contactFields || {}), [field]: target.checked };
+    persistState();
+    renderReadonlySections();
+    renderTemplatePreview();
+}
+
+function setClosingEditing(editing) {
+    if (!elements.closingEditor) return;
+    elements.closingEditor.hidden = !editing;
+    elements.templateClosingReadonly.hidden = editing;
+    if (elements.closingEdit) elements.closingEdit.hidden = editing;
+    if (editing && elements.closingTextarea) {
+        elements.closingTextarea.value = state.closingText || '';
+        elements.closingTextarea.focus();
+    }
+}
+
+function handleClosingInput() {
+    state.closingText = elements.closingTextarea.value;
+    persistState();
+    renderReadonlySections();
+    renderTemplatePreview();
+}
+
+function handleClosingReset() {
+    state.closingText = defaultClosingText(state.userInfo || {});
+    persistState();
+    if (elements.closingTextarea) elements.closingTextarea.value = state.closingText;
+    renderReadonlySections();
+    renderTemplatePreview();
 }
 
 function renderTemplatePreview() {
@@ -622,7 +736,13 @@ async function initTemplateView() {
             state.templateBody = '';
         }
     }
+    if (!state.closingText) {
+        state.closingText = defaultClosingText(state.userInfo || {});
+        persistState();
+    }
     elements.templateBody.value = state.templateBody;
+    setContactInfoEditing(false);
+    setClosingEditing(false);
     renderReadonlySections();
     renderTemplatePreview();
 }
@@ -932,6 +1052,27 @@ function initEventListeners() {
         state.templateBody = elements.templateBody.value;
         renderTemplatePreview();
     });
+    if (elements.contactInfoEdit) {
+        elements.contactInfoEdit.addEventListener('click', () => setContactInfoEditing(true));
+    }
+    if (elements.contactInfoDone) {
+        elements.contactInfoDone.addEventListener('click', () => setContactInfoEditing(false));
+    }
+    if (elements.contactFieldsCheckboxes) {
+        elements.contactFieldsCheckboxes.addEventListener('change', handleContactFieldToggle);
+    }
+    if (elements.closingEdit) {
+        elements.closingEdit.addEventListener('click', () => setClosingEditing(true));
+    }
+    if (elements.closingDone) {
+        elements.closingDone.addEventListener('click', () => setClosingEditing(false));
+    }
+    if (elements.closingReset) {
+        elements.closingReset.addEventListener('click', handleClosingReset);
+    }
+    if (elements.closingTextarea) {
+        elements.closingTextarea.addEventListener('input', handleClosingInput);
+    }
 
     // Step 5
     elements.queueOpen.addEventListener('click', handleQueueOpen);
@@ -964,7 +1105,12 @@ function handleLanguageChange() {
     // Re-render any dynamic content that was built before language changed.
     const step = currentStep();
     if (step === 'overview' && state.therapists.length) renderTherapists();
-    if (step === 'template') renderTemplatePreview();
+    if (step === 'template') {
+        renderTemplatePreview();
+        if (elements.contactInfoEditor && !elements.contactInfoEditor.hidden) {
+            renderContactFieldsCheckboxes();
+        }
+    }
     if (step === 'send') renderQueueItem();
 }
 
