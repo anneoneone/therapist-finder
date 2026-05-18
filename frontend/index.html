@@ -224,9 +224,13 @@
                 </div>
                 <div class="card-body">
                     <p class="dropzone-hint" data-i18n="step4.languageNotice">
-                        Emails are sent to German-speaking therapists, so the greeting, contact info, and closing are in German. The UI language only affects this interface.
+                        Pick the language for the greeting, contact info, and closing. Defaults to German since psych-info therapists are German-speaking. Your message body stays as you wrote it.
                     </p>
                     <form id="template-form" class="form">
+                        <div class="form-group">
+                            <label for="target-lang" data-i18n="step4.targetLangLabel">Email language</label>
+                            <select id="target-lang" class="lang-select"></select>
+                        </div>
                         <div class="form-group">
                             <label data-i18n="step4.greetingLabel">Greeting (auto-generated)</label>
                             <pre id="template-greeting-readonly" class="template-readonly"></pre>
