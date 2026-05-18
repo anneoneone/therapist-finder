@@ -7,6 +7,7 @@ from typing import Any
 
 from ..config import Settings
 from ..models import TherapistData
+from ..utils.salutation import make_salutation
 
 
 class BaseParser(ABC):
@@ -57,16 +58,7 @@ class BaseParser(ABC):
 
     def _generate_salutation(self, name: str) -> str:
         """Generate appropriate salutation based on name."""
-        title_match = re.search(r"(Dr\.|Dipl\.-Psych\.)", name)
-        title = title_match.group(0) if title_match else ""
-        last_name = name.split()[-1] if name else ""
-
-        if "Frau" in name:
-            return f"Sehr geehrte Frau {title} {last_name}".strip()
-        elif "Herr" in name:
-            return f"Sehr geehrter Herr {title} {last_name}".strip()
-        else:
-            return f"Sehr geehrte/r {title} {last_name}".strip()
+        return make_salutation(name)
 
     def _should_add_entry(self, entry: dict[str, Any]) -> bool:
         """Check if entry should be added (no duplicate emails)."""
