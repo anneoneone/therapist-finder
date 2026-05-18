@@ -164,15 +164,39 @@ export async function healthCheck() {
 
 /**
  * Record that this browser opened a mail draft for the given therapist.
+ * When `body` is provided, it is also appended to the sent_mails log so
+ * future AI generations can avoid repeating phrasing.
  * @param {string} email
  * @param {string} browserId
+ * @param {{body?: string, targetLang?: string}} [extras]
  * @returns {Promise<{recorded: boolean}>}
  */
-export async function recordContact(email, browserId) {
+export async function recordContact(email, browserId, extras = {}) {
+    const payload = { email, browser_id: browserId };
+    if (extras.body) payload.body = extras.body;
+    if (extras.targetLang) payload.target_lang = extras.targetLang;
     return request('/contacts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, browser_id: browserId }),
+        body: JSON.stringify(payload),
+    });
+}
+
+/**
+ * Generate a therapist-inquiry mail body via the backend's LLM.
+ * @param {{targetLang: string, insurance?: string|null, therapistEmails: string[], browserId: string}} args
+ * @returns {Promise<{body: string}>}
+ */
+export async function aiGenerateMailBody({ targetLang, insurance, therapistEmails, browserId }) {
+    return request('/emails/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            target_lang: targetLang,
+            insurance: insurance ?? null,
+            therapist_emails: therapistEmails || [],
+            browser_id: browserId,
+        }),
     });
 }
 

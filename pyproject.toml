@@ -25,6 +25,9 @@ fastapi = "^0.115.0"
 uvicorn = { extras = ["standard"], version = "^0.32.0" }
 python-multipart = "^0.0.12"
 gender-guesser = "^0.4.0"
+# Gemini (Google AI Studio) — used by the optional AI mail body generator.
+# Feature degrades gracefully when GEMINI_API_KEY is unset.
+google-genai = "^1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.0"

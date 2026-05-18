@@ -101,6 +101,27 @@ class TemplateResponse(BaseModel):
     body: str
 
 
+class AiGenerateRequest(BaseModel):
+    """Request for POST /emails/ai-generate."""
+
+    target_lang: str = Field(..., description="Language code for the body (e.g. 'de')")
+    insurance: str | None = Field(None, description="Insurance label, optional")
+    therapist_emails: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Therapist emails in the current send batch; used to look up "
+            "prior mail bodies so the AI can avoid repeating phrasing."
+        ),
+    )
+    browser_id: str = Field(..., description="Anonymous per-browser identifier")
+
+
+class AiGenerateResponse(BaseModel):
+    """Response from POST /emails/ai-generate."""
+
+    body: str
+
+
 class HealthResponse(BaseModel):
     """Health check response."""
 
