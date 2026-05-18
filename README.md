@@ -114,6 +114,9 @@ The `/api/contacts/*` endpoints (used for the send-queue balancer and
 Path is configurable via `THERAPIST_FINDER_CONTACTS_DB`; default is
 `contacts.db` in the working directory.
 
+The same DB also stores the body of every sent mail (`sent_mails` table)
+so the AI generator (below) can vary phrasing on re-contact.
+
 > ⚠️ **Render free tier:** the service runs on ephemeral disk, so
 > `contacts.db` is wiped on every redeploy and after long idle periods.
 > Counts and per-browser history reset with it. For durable storage,
@@ -121,6 +124,20 @@ Path is configurable via `THERAPIST_FINDER_CONTACTS_DB`; default is
 > at a path on it, or migrate the store to managed Postgres
 > (`therapist_finder/api/contacts_store.py` is the only module that needs
 > to change).
+
+### AI mail body generation (optional)
+
+Step 4 has a **"Generate with AI"** button that drafts the user's message
+body via Google Gemini. To enable it, set `GEMINI_API_KEY` (free tier via
+[Google AI Studio](https://aistudio.google.com/)). When the key is unset
+the endpoint returns 503 and the frontend shows an inline "not configured"
+notice — everything else still works, the user just writes the body
+themselves.
+
+No PII is sent to the LLM: only the target language, insurance label,
+and previously sent bodies to the same therapists (for anti-repetition).
+Greeting, contact info, and closing are inserted client-side after
+generation.
 
 ## Development
 

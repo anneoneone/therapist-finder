@@ -5,6 +5,7 @@
 
 import {
     APIError,
+    aiGenerateMailBody,
     downloadFile,
     generateEmails,
     getContactCounts,
@@ -151,6 +152,8 @@ const elements = {
     templateStatus: $('template-status'),
     templatePreviewTarget: $('template-preview-target'),
     templatePreviewBody: $('template-preview-body'),
+    aiGenerateBtn: $('ai-generate-btn'),
+    aiGenerateStatus: $('ai-generate-status'),
 
     // Step 5
     viewSend: $('view-send'),
@@ -1148,7 +1151,13 @@ function handleQueueOpen() {
     markEmailContacted(draft.to);
     // Best-effort backend persistence; the localStorage write above keeps
     // the user-visible behaviour working even if the API is unreachable.
-    recordContact(draft.to, getBrowserId()).catch((error) => {
+    // We log the user's actual message body (not the assembled mail with
+    // greeting/contact-info/closing) so the AI generator can vary phrasing
+    // against the *substantive* part of prior sends.
+    recordContact(draft.to, getBrowserId(), {
+        body: state.templateBody || '',
+        targetLang: getTargetLang(),
+    }).catch((error) => {
         console.warn('Failed to record contact on backend:', error);
     });
     elements.queueNext.disabled = false;
@@ -1177,6 +1186,42 @@ async function handleQueueCopyBody() {
     } catch (error) {
         console.warn('Clipboard write failed:', error);
         showStatus(elements.queueStatus, t('step5.statusClipboardFailed'), 'warning');
+    }
+}
+
+async function handleAiGenerate() {
+    const btn = elements.aiGenerateBtn;
+    if (!btn || btn.disabled) return;
+    const btnText = btn.querySelector('.btn-text');
+    const btnLoader = btn.querySelector('.btn-loader');
+    btn.disabled = true;
+    if (btnText) btnText.hidden = true;
+    if (btnLoader) btnLoader.hidden = false;
+    if (elements.aiGenerateStatus) elements.aiGenerateStatus.hidden = true;
+
+    try {
+        const therapistEmails = (state.therapists || [])
+            .map((th) => (th.email || '').trim())
+            .filter(Boolean);
+        const { body } = await aiGenerateMailBody({
+            targetLang: getTargetLang(),
+            insurance: (state.userInfo && state.userInfo.insurance) || null,
+            therapistEmails,
+            browserId: getBrowserId(),
+        });
+        elements.templateBody.value = body || '';
+        state.templateBody = elements.templateBody.value;
+        persistState();
+        renderTemplatePreview();
+    } catch (error) {
+        const msg = (error instanceof APIError && error.status === 503)
+            ? t('step4.aiGenerateNotConfigured')
+            : t('step4.aiGenerateError');
+        showStatus(elements.aiGenerateStatus, msg, 'warning');
+    } finally {
+        btn.disabled = false;
+        if (btnText) btnText.hidden = false;
+        if (btnLoader) btnLoader.hidden = true;
     }
 }
 
@@ -1258,6 +1303,9 @@ function initEventListeners() {
     }
     if (elements.closingTextarea) {
         elements.closingTextarea.addEventListener('input', handleClosingInput);
+    }
+    if (elements.aiGenerateBtn) {
+        elements.aiGenerateBtn.addEventListener('click', handleAiGenerate);
     }
 
     // Step 5

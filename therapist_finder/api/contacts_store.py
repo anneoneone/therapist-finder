@@ -42,7 +42,7 @@ def _connect(path: Path | None = None) -> Iterator[sqlite3.Connection]:
 
 
 def init_db(path: Path | None = None) -> None:
-    """Create the contacts table and indexes if they do not exist."""
+    """Create the contacts and sent_mails tables and indexes if missing."""
     with _connect(path) as conn:
         conn.executescript(
             """
@@ -57,6 +57,19 @@ def init_db(path: Path | None = None) -> None:
                 ON contacts(email);
             CREATE INDEX IF NOT EXISTS idx_contacts_browser
                 ON contacts(browser_id);
+
+            CREATE TABLE IF NOT EXISTS sent_mails (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                therapist_email TEXT NOT NULL,
+                browser_id TEXT NOT NULL,
+                body TEXT NOT NULL,
+                target_lang TEXT,
+                sent_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_sent_mails_email
+                ON sent_mails(therapist_email);
+            CREATE INDEX IF NOT EXISTS idx_sent_mails_browser
+                ON sent_mails(browser_id);
             """
         )
 
@@ -119,6 +132,73 @@ def get_counts(
         for email in normalized:
             counts.setdefault(email, 0)
         return counts
+
+
+def record_sent_mail(
+    therapist_email: str,
+    browser_id: str,
+    body: str,
+    *,
+    target_lang: str | None = None,
+    path: Path | None = None,
+    now: datetime | None = None,
+) -> None:
+    """Persist the body of a mail the user has just sent to a therapist.
+
+    Unlike ``record_contact`` this is not deduplicated: each send is a new
+    row so the LLM prompt in #20 can see every prior phrasing and vary
+    accordingly.
+    """
+    normalized = _normalize_email(therapist_email)
+    bid = browser_id.strip()
+    text = body.strip()
+    if not normalized or not bid or not text:
+        raise ValueError("therapist_email, browser_id and body are required")
+    when = (now or datetime.now(timezone.utc)).isoformat()
+    lang = (target_lang or "").strip() or None
+    with _connect(path) as conn:
+        conn.execute(
+            "INSERT INTO sent_mails "
+            "(therapist_email, browser_id, body, target_lang, sent_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (normalized, bid, text, lang, when),
+        )
+
+
+def get_prior_mails(
+    therapist_emails: Iterable[str],
+    *,
+    limit_per_email: int = 3,
+    path: Path | None = None,
+) -> dict[str, list[str]]:
+    """Return the most recent prior mail bodies per therapist email.
+
+    Used by the AI generator to avoid repeating phrasing across re-contacts.
+    Keys are normalized (lowercased) emails; emails with no prior mails are
+    omitted.
+    """
+    normalized = [_normalize_email(e) for e in therapist_emails if e and e.strip()]
+    if not normalized:
+        return {}
+    if limit_per_email <= 0:
+        return {}
+    placeholders = ",".join("?" * len(normalized))
+    out: dict[str, list[str]] = {}
+    with _connect(path) as conn:
+        # Pull all rows for the requested emails ordered newest-first, then
+        # truncate per email in Python — simpler than a windowed SQL query
+        # and the row count here is tiny.
+        query = (
+            "SELECT therapist_email, body FROM sent_mails "  # nosec B608
+            f"WHERE therapist_email IN ({placeholders}) "
+            "ORDER BY sent_at DESC"
+        )
+        rows = conn.execute(query, normalized).fetchall()
+    for row in rows:
+        bucket = out.setdefault(row["therapist_email"], [])
+        if len(bucket) < limit_per_email:
+            bucket.append(row["body"])
+    return out
 
 
 def get_user_contacts(browser_id: str, *, path: Path | None = None) -> list[str]:

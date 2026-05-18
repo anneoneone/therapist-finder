@@ -6,7 +6,11 @@ from ...config import Settings
 from ...email.generator import EmailGenerator
 from ...email.templates import TemplateManager
 from ...models import TherapistData, UserInfo
+from .. import contacts_store
+from ..ai.mail_generator import AiUnavailableError, generate_mail_body
 from ..schemas import (
+    AiGenerateRequest,
+    AiGenerateResponse,
     EmailDraftResponse,
     GenerateRequest,
     GenerateResponse,
@@ -137,3 +141,34 @@ async def generate_emails(request: GenerateRequest) -> GenerateResponse:
             status_code=500,
             detail=f"Failed to generate emails: {str(e)}",
         ) from e
+
+
+@router.post("/ai-generate", response_model=AiGenerateResponse)
+async def ai_generate_mail_body(req: AiGenerateRequest) -> AiGenerateResponse:
+    """Generate a therapist-inquiry mail body via the configured LLM.
+
+    Looks up previously sent bodies for the requested therapist emails so
+    the model can vary phrasing on re-contact. Returns the body only —
+    greeting, contact info, and closing are added client-side by the
+    existing language packs.
+    """
+    prior_map = contacts_store.get_prior_mails(req.therapist_emails)
+    prior_bodies: list[str] = []
+    for bodies in prior_map.values():
+        prior_bodies.extend(bodies)
+
+    try:
+        body = generate_mail_body(
+            target_lang=req.target_lang,
+            insurance=req.insurance,
+            prior_bodies=prior_bodies,
+        )
+    except AiUnavailableError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"AI generation failed: {e}",
+        ) from e
+
+    return AiGenerateResponse(body=body)

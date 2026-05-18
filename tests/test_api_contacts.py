@@ -91,3 +91,64 @@ def test_record_rejects_empty_fields(temp_db: Path) -> None:
     resp = client.post("/api/contacts", json={"email": "  ", "browser_id": "anon"})
     # ValueError is mapped to 400 by the global exception handler.
     assert resp.status_code == 400
+
+
+def test_record_contact_logs_body_when_provided(temp_db: Path) -> None:
+    """When body is included, the row also lands in sent_mails."""
+    client = TestClient(app)
+    resp = client.post(
+        "/api/contacts",
+        json={
+            "email": "doc@example.com",
+            "browser_id": "anon-1",
+            "body": "Erste Anfrage.",
+            "target_lang": "de",
+        },
+    )
+    assert resp.status_code == 200
+    prior = contacts_store.get_prior_mails(["doc@example.com"])
+    assert prior == {"doc@example.com": ["Erste Anfrage."]}
+
+
+def test_record_contact_without_body_does_not_log_sent_mail(temp_db: Path) -> None:
+    client = TestClient(app)
+    resp = client.post(
+        "/api/contacts",
+        json={"email": "doc@example.com", "browser_id": "anon-1"},
+    )
+    assert resp.status_code == 200
+    assert contacts_store.get_prior_mails(["doc@example.com"]) == {}
+
+
+def test_get_prior_mails_returns_newest_first_and_limits(temp_db: Path) -> None:
+    """Older bodies are dropped beyond limit_per_email."""
+    from datetime import datetime, timedelta, timezone
+
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    for i in range(5):
+        contacts_store.record_sent_mail(
+            "doc@example.com",
+            "anon-1",
+            f"Body #{i}",
+            target_lang="de",
+            now=base + timedelta(minutes=i),
+        )
+
+    result = contacts_store.get_prior_mails(["doc@example.com"], limit_per_email=2)
+    # Newest first, capped at 2.
+    assert result == {"doc@example.com": ["Body #4", "Body #3"]}
+
+
+def test_get_prior_mails_normalizes_email_case(temp_db: Path) -> None:
+    contacts_store.record_sent_mail(
+        "Doc@Example.com", "anon-1", "Hi.", target_lang="de"
+    )
+    result = contacts_store.get_prior_mails(["DOC@example.com"])
+    assert result == {"doc@example.com": ["Hi."]}
+
+
+def test_record_sent_mail_rejects_empty_body(temp_db: Path) -> None:
+    with pytest.raises(ValueError):
+        contacts_store.record_sent_mail(
+            "doc@example.com", "anon-1", "   ", target_lang="de"
+        )

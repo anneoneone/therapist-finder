@@ -16,3 +16,7 @@ services:
         value: "3.11"
       - key: CORS_ORIGINS
         sync: false
+      # Optional: enables the "Generate with AI" button on step 4. Without
+      # it the endpoint returns 503 and the frontend shows an inline notice.
+      - key: GEMINI_API_KEY
+        sync: false

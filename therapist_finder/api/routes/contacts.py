@@ -15,6 +15,18 @@ class RecordContactRequest(BaseModel):
 
     email: str = Field(..., description="Therapist email that was contacted")
     browser_id: str = Field(..., description="Anonymous per-browser identifier")
+    body: str | None = Field(
+        default=None,
+        description=(
+            "Optional rendered mail body. When provided, it is appended to "
+            "the sent_mails log so future AI generations can avoid repeating "
+            "phrasing."
+        ),
+    )
+    target_lang: str | None = Field(
+        default=None,
+        description="Optional target language code stored alongside the body.",
+    )
 
 
 class RecordContactResponse(BaseModel):
@@ -46,8 +58,20 @@ class MineResponse(BaseModel):
 
 @router.post("", response_model=RecordContactResponse)
 async def record(req: RecordContactRequest) -> RecordContactResponse:
-    """Record a contact event. Idempotent per ``(email, browser_id)``."""
+    """Record a contact event. Idempotent per ``(email, browser_id)``.
+
+    When ``body`` is provided, the mail text is also appended to the
+    ``sent_mails`` table so the AI generator can use prior phrasing as
+    anti-repetition context.
+    """
     inserted = contacts_store.record_contact(req.email, req.browser_id)
+    if req.body and req.body.strip():
+        contacts_store.record_sent_mail(
+            req.email,
+            req.browser_id,
+            req.body,
+            target_lang=req.target_lang,
+        )
     return RecordContactResponse(recorded=inserted)
 
 
