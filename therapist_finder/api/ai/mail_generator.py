@@ -16,7 +16,11 @@ import re
 
 from .prompts import SYSTEM_INSTRUCTION, build_user_prompt
 
-_MODEL = "gemini-2.0-flash"
+# Default to gemini-2.5-flash-lite: the current free-tier model with the
+# most generous quota for short text generation. gemini-2.0-flash was
+# retired from the free tier (limit=0). Overridable via env so the model
+# can be swapped without a deploy when Google rotates quotas again.
+_DEFAULT_MODEL = "gemini-2.5-flash-lite"
 
 # Strip accidental greetings/closings if the model includes them anyway.
 # Matches the most common German/English variants at line start or end.
@@ -95,8 +99,9 @@ def generate_mail_body(
         ) from exc
 
     client = genai.Client(api_key=api_key)
+    model = os.getenv("GEMINI_MODEL", _DEFAULT_MODEL)
     response = client.models.generate_content(
-        model=_MODEL,
+        model=model,
         contents=build_user_prompt(
             target_lang=target_lang,
             insurance=insurance,
