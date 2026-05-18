@@ -243,12 +243,37 @@
                                 required></textarea>
                         </div>
                         <div class="form-group">
-                            <label data-i18n="step4.basicInfoLabel">Your contact info</label>
+                            <div class="template-section-header">
+                                <label data-i18n="step4.basicInfoLabel">Your contact info</label>
+                                <button type="button" class="btn-text-link" id="contact-info-edit" data-i18n="step4.editBtn">Edit</button>
+                            </div>
                             <pre id="template-basic-info-readonly" class="template-readonly"></pre>
+                            <div id="template-basic-info-editor" class="template-section-editor" hidden>
+                                <p class="template-section-hint" data-i18n="step4.basicInfoHint">Pick which contact details to include in your email.</p>
+                                <div class="checkbox-list" id="contact-fields-checkboxes"></div>
+                                <div class="template-section-actions">
+                                    <button type="button" class="btn btn-secondary" id="contact-info-done" data-i18n="step4.doneBtn">Done</button>
+                                </div>
+                            </div>
                         </div>
                         <div class="form-group">
-                            <label data-i18n="step4.closingLabel">Closing</label>
+                            <div class="template-section-header">
+                                <label data-i18n="step4.closingLabel">Closing</label>
+                                <button type="button" class="btn-text-link" id="closing-edit" data-i18n="step4.editBtn">Edit</button>
+                            </div>
                             <pre id="template-closing-readonly" class="template-readonly"></pre>
+                            <div id="template-closing-editor" class="template-section-editor" hidden>
+                                <textarea
+                                    id="template-closing-textarea"
+                                    class="template-editor template-closing-editor"
+                                    rows="3"
+                                    data-i18n-placeholder="step4.closingPlaceholder"
+                                    placeholder="Mit besten Grüßen…"></textarea>
+                                <div class="template-section-actions">
+                                    <button type="button" class="btn btn-secondary" id="closing-reset" data-i18n="step4.resetBtn">Reset</button>
+                                    <button type="button" class="btn btn-secondary" id="closing-done" data-i18n="step4.doneBtn">Done</button>
+                                </div>
+                            </div>
                         </div>
                         <div class="template-preview">
                             <div class="template-preview-header">
