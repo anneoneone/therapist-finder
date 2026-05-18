@@ -208,6 +208,22 @@ html[dir="rtl"] .stepper-list {
     font-size: var(--font-size-sm);
 }
 
+.footer-support {
+    margin-top: var(--space-sm);
+}
+
+.footer-support-link {
+    color: var(--color-text-muted);
+    text-decoration: none;
+    border-bottom: 1px dotted currentColor;
+}
+
+.footer-support-link:hover,
+.footer-support-link:focus {
+    color: var(--color-primary, var(--color-text));
+    border-bottom-style: solid;
+}
+
 /* ========================================
    Cards
    ======================================== */
